@@ -5,69 +5,101 @@
 #include "cuda_gl_interop.h"
 #include "device_launch_parameters.h"
 
+#include "CudaErrorMessage.h"
+#include "GpuGlInteropAnim.h"
+
+#include <stdio.h>
+
+#include <exception>
 #include <iostream>
+#include <iterator>
+#include <fstream>
+#include <sstream>
+#include <vector>
 
-#ifndef GL_ARB_pixel_buffer_object
-#define GL_PIXEL_PACK_BUFFER_ARB            0x88EB
-#define GL_PIXEL_UNPACK_BUFFER_ARB          0x88EC
-#define GL_PIXEL_PACK_BUFFER_BINDING_ARB    0x88ED
-#define GL_PIXEL_UNPACK_BUFFER_BINDING_ARB  0x88EF
-#endif
-
-#ifndef GL_ARB_vertex_buffer_object
-#define GL_BUFFER_SIZE_ARB                0x8764
-#define GL_BUFFER_USAGE_ARB               0x8765
-#define GL_ARRAY_BUFFER_ARB               0x8892
-#define GL_ELEMENT_ARRAY_BUFFER_ARB       0x8893
-#define GL_ARRAY_BUFFER_BINDING_ARB       0x8894
-#define GL_ELEMENT_ARRAY_BUFFER_BINDING_ARB 0x8895
-#define GL_VERTEX_ARRAY_BUFFER_BINDING_ARB 0x8896
-#define GL_NORMAL_ARRAY_BUFFER_BINDING_ARB 0x8897
-#define GL_COLOR_ARRAY_BUFFER_BINDING_ARB 0x8898
-#define GL_INDEX_ARRAY_BUFFER_BINDING_ARB 0x8899
-#define GL_TEXTURE_COORD_ARRAY_BUFFER_BINDING_ARB 0x889A
-#define GL_EDGE_FLAG_ARRAY_BUFFER_BINDING_ARB 0x889B
-#define GL_SECONDARY_COLOR_ARRAY_BUFFER_BINDING_ARB 0x889C
-#define GL_FOG_COORDINATE_ARRAY_BUFFER_BINDING_ARB 0x889D
-#define GL_WEIGHT_ARRAY_BUFFER_BINDING_ARB 0x889E
-#define GL_VERTEX_ATTRIB_ARRAY_BUFFER_BINDING_ARB 0x889F
-#define GL_READ_ONLY_ARB                  0x88B8
-#define GL_WRITE_ONLY_ARB                 0x88B9
-#define GL_READ_WRITE_ARB                 0x88BA
-#define GL_BUFFER_ACCESS_ARB              0x88BB
-#define GL_BUFFER_MAPPED_ARB              0x88BC
-#define GL_BUFFER_MAP_POINTER_ARB         0x88BD
-#define GL_STREAM_DRAW_ARB                0x88E0
-#define GL_STREAM_READ_ARB                0x88E1
-#define GL_STREAM_COPY_ARB                0x88E2
-#define GL_STATIC_DRAW_ARB                0x88E4
-#define GL_STATIC_READ_ARB                0x88E5
-#define GL_STATIC_COPY_ARB                0x88E6
-#define GL_DYNAMIC_DRAW_ARB               0x88E8
-#define GL_DYNAMIC_READ_ARB               0x88E9
-#define GL_DYNAMIC_COPY_ARB               0x88EA
-#endif
-
-typedef void(*ProcGlGenBuffers)(GLsizei n, GLuint* buffers);
-typedef void(*ProcGlBindBuffer)(GLenum target, GLuint buffer);
-typedef void(*ProcGlBufferData)(GLenum target, GLsizei size, const GLvoid* data, GLenum usage);
-typedef void(*ProcGlDeleteBuffers)(GLsizei n, const GLuint * buffers);
+#define R 0
+#define G 1
+#define B 2
+#define A 3
 
 using std::cout;
 using std::cerr;
 using std::endl;
+using std::getline;
+using std::exception;
+using std::ifstream;
+using std::istringstream;
+using std::istream_iterator;
+using std::string;
+using std::ios;
+using std::runtime_error;
+using std::vector;
 
 GLuint bufferObj;
 cudaGraphicsResource* resource;
 
-ProcGlGenBuffers glGenBuffers = nullptr;
-ProcGlBindBuffer glBindBuffer = nullptr;
-ProcGlBufferData glBufferData = nullptr;
-ProcGlDeleteBuffers glDeleteBuffers = nullptr;
+float* ts;
+
+dim3 rmnDim;
+
+unsigned int imageHeigth = 512;
+unsigned int imageWidth = 512;
 
 const int dim = 512;
 
-__global__ void kernel(uchar4* ptr)
+__device__ float4 colors[10];
+__device__ uint2 colormap[10];
+__device__ size_t colormapLength = 0;
+
+__device__ unsigned int getColormapValue(size_t key)
+{
+    return colormap[key].x;
+}
+
+__device__ unsigned int getColormapColor(size_t key)
+{
+    return colormap[key].y;
+}
+
+__global__ void setColormapValue(size_t key, unsigned int value)
+{
+    colormap[key].x = value;
+    colormapLength++;
+}
+
+__global__ void setColormapColor(size_t key, unsigned int color)
+{
+    colormap[key].y = color;
+}
+
+__device__ float getColorValue(size_t key, size_t color)
+{
+    return ((float*)(colors + key))[color];
+}
+
+__global__ void setColorValue(size_t key, size_t color, float value)
+{
+    ((float*)(colors + key))[color] = value;
+}
+
+__device__ int getPositionForColormapEntryValue(float value)
+{
+    for (size_t i = 0; i < colormapLength; i++)
+    {
+        if (getColormapValue(i) > value)
+            return i - 1;
+    }
+
+    return -1;
+}
+
+__device__ const float pi = 3.141592653f;
+__device__ const float epsilon = 0.001f;
+__device__ const float step = 0.1f;
+__device__ const float ambient = 0.3f;
+__device__ const float diffuse = 0.7f;
+
+__global__ void simpleCudaGreenRipple(uchar4* ptr)
 {
     int x = threadIdx.x + blockIdx.x * blockDim.x;
     int y = threadIdx.y + blockIdx.y * blockDim.y;
@@ -83,29 +115,385 @@ __global__ void kernel(uchar4* ptr)
     ptr[offset].w = 255;
 }
 
-static void key_func(unsigned char key, int x, int y)
+__global__ void simpleFrontRenderer(char* rmnData, size_t xDim, size_t yDim, size_t zDim, uchar4* ptr)
 {
-    cudaError error;
+    int x = blockIdx.x;
+    int y = blockIdx.y;
+    int offset = x + y * gridDim.x;
 
-    switch (key)
+    int opacity = 0;
+
+    ptr[offset].x = 0;
+    ptr[offset].y = 0;
+    ptr[offset].z = 0;
+    ptr[offset].w = 255;
+
+    for (int i = 25; i < 26; i++)
+    { 
+        if (rmnData[i + x * xDim + y * xDim * yDim] != 0)
+            opacity += rmnData[i + x * xDim + y * xDim * yDim];
+
+        if (rmnData[i + x * xDim + y * xDim * yDim] == 0)
+            opacity = 0;
+    
+        if (opacity >= 1)
+        {
+            ptr[offset].x = 255;
+            ptr[offset].y = 0;
+            ptr[offset].z = 0;
+    
+            return;
+        }
+    } 
+}
+
+__device__ int pointNormal(dim3 dataSize, float3 point)
+{
+    int i = point.x, j = point.y, k = point.z;
+
+    i = i < 0 ? 0 : (i >= dataSize.x ? dataSize.x - 1 : i);
+    j = j < 0 ? 0 : (j >= dataSize.y ? dataSize.y - 1 : j);
+    k = k < 0 ? 0 : (k >= dataSize.z ? dataSize.z - 1 : k);
+
+    return i * dataSize.y * dataSize.z + j * dataSize.z + k;
+}
+
+__device__ float composeRGBA(float prev, float color, float alpha)
+{
+    return prev * (1 - alpha) + color * alpha;
+}
+
+__device__ unsigned char colorFloatToByte(float color)
+{
+    float f = 255 * color;
+    
+    if (f < 0) f = 0.0f;
+    if (f > 255) f = 255.0f;
+
+    return floor(f);
+}
+
+__device__ float length(float x, float y, float z)
+{
+    return sqrt(x * x + y * y + z * z);
+}
+
+__device__ float vectorLength(float3 vector)
+{
+    return sqrt(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z);
+}
+
+__device__ float3 normalizeVector(float3 vector)
+{
+    float3 normalizedVector;
+    float length = vectorLength(vector);
+
+    normalizedVector.x = vector.x / length;
+    normalizedVector.y = vector.y / length;
+    normalizedVector.z = vector.z / length;
+
+    return normalizedVector;
+}
+
+__device__ float imageCoordonateToViewPlane(size_t imageCoordonate, size_t imageSize, float viewPlaneSize)
+{
+    return (float)imageCoordonate * viewPlaneSize / (float)imageSize - viewPlaneSize / 2.0f;
+}
+
+__global__ void calculateNormals(unsigned char* rmnData, dim3 dataSize, float3* normals)
+{
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    int j = threadIdx.y + blockIdx.y * blockDim.y;
+
+    float3 m, p, normal;
+    dim3 s;
+
+    s.x = dataSize.y * dataSize.z;
+    s.y = dataSize.z;
+    s.z = 1;
+
+    if (i >= dataSize.x || j >= dataSize.y) return;
+
+    for (size_t k = 0; k < dataSize.z; k++)
     {
-    case 27:
-        error = cudaGraphicsUnregisterResource(resource);
-        if (error != cudaSuccess)
-            std::cerr << "cudaGraphicsUnregisterResource failed with error code " << error << endl;
-        glBindBuffer(GL_PIXEL_UNPACK_BUFFER_ARB, 0);
-        glDeleteBuffers(1, &bufferObj);
-        exit(0);
-        break;
-    default:
-        break;
+        m.x = i == 0 ? 0 : rmnData[(i - 1) * s.x + (j - 0) * s.y + (k - 0) * s.z];
+        p.x = i == dataSize.x - 1 ? 0 : rmnData[(i + 1) * s.x + (j + 0) * s.y + (k + 0) * s.z];
+        normal.x = p.x - m.x;
+
+        m.y = j == 0 ? 0 : rmnData[(i - 0) * s.x + (j - 1) * s.y + (k - 0) * s.z];
+        p.y = j == dataSize.y - 1 ? 0 : rmnData[(i + 0) * s.x + (j + 1) * s.y + (k + 0) * s.z];
+        normal.y = p.y - m.y;
+
+        m.z = k == 0 ? 0 : rmnData[(i - 0) * s.x + (j - 0) * s.y + (k - 1) * s.z];
+        p.z = k == dataSize.z - 1 ? 0 : rmnData[(i + 0) * s.x + (j + 0) * s.y + (k + 1) * s.z];
+        normal.z = p.z - m.z;
+
+        normals[i * s.x + j * s.y + k * s.z] = normalizeVector(normal);
     }
 }
 
-static void draw_func(void)
+__device__ float meanPointValue(unsigned char* rmnData, dim3 dataSize, float3 point)
 {
-    glDrawPixels(dim, dim, GL_RGBA, GL_UNSIGNED_BYTE, 0);
-    glutSwapBuffers();
+    int i = point.x;
+    int j = point.y;
+    int k = point.z;
+
+    float xf = point.x - i;
+    float yf = point.y - j;
+    float zf = point.z - k;
+
+    unsigned char c000, c001, c010, c011, c100, c101, c110, c111;
+
+    if (i >= 0 && i + 1 < dataSize.x && j >= 0 && j + 1 < dataSize.y && k >= 0 && k + 1 < dataSize.z)
+    {
+        c000 = rmnData[(i + 0) * dataSize.y * dataSize.z + (j + 0) * dataSize.z + (k + 0)];
+        c001 = rmnData[(i + 0) * dataSize.y * dataSize.z + (j + 0) * dataSize.z + (k + 1)];
+        c010 = rmnData[(i + 0) * dataSize.y * dataSize.z + (j + 1) * dataSize.z + (k + 0)];
+        c011 = rmnData[(i + 0) * dataSize.y * dataSize.z + (j + 1) * dataSize.z + (k + 1)];
+        c100 = rmnData[(i + 1) * dataSize.y * dataSize.z + (j + 0) * dataSize.z + (k + 0)];
+        c101 = rmnData[(i + 1) * dataSize.y * dataSize.z + (j + 0) * dataSize.z + (k + 1)];
+        c110 = rmnData[(i + 1) * dataSize.y * dataSize.z + (j + 1) * dataSize.z + (k + 0)];
+        c111 = rmnData[(i + 1) * dataSize.y * dataSize.z + (j + 1) * dataSize.z + (k + 1)];
+    }
+
+    float c00 = c000 * (1.0f - xf) + c100 * xf;
+    float c10 = c010 * (1.0f - xf) + c110 * xf;
+    float c01 = c001 * (1.0f - xf) + c101 * xf;
+    float c11 = c011 * (1.0f - xf) + c111 * xf;
+
+    float c0 = c00 * (1.0f - yf) + c10 * yf;
+    float c1 = c01 * (1.0f - yf) + c11 * yf;
+
+    float c = c0 * (1.0f - zf) + c1 * zf;
+
+    return c;
+}
+
+__global__ void renderFrame(unsigned char* rmnData, dim3 dataSize, uint2 imageDim, unsigned int rotation, float3* normals, uchar4* ptr)
+{
+    size_t x = threadIdx.x + blockIdx.x * blockDim.x;
+    size_t y = threadIdx.y + blockIdx.y * blockDim.y;
+    size_t imageWidth = imageDim.x;
+    size_t imageHeight = imageDim.y;
+    size_t offset = (imageHeight - y - 1) * imageWidth + imageWidth - x - 1;
+
+    if (x > imageWidth || y > imageHeight) return;
+
+    float dsx = dataSize.x, dsy = dataSize.y, dsz = dataSize.z;
+
+    float4 plane[6] = {
+        { 1.0f, 0.0f, 0.0f,  0.0f },
+        { 1.0f, 0.0f, 0.0f, -dsx  },
+        { 0.0f, 1.0f, 0.0f,  0.0f },
+        { 0.0f, 1.0f, 0.0f, -dsy  },
+        { 0.0f, 0.0f, 1.0f,  0.0f },
+        { 0.0f, 0.0f, 1.0f, -dsz  },
+    };
+
+    float3 viewPointPosition;
+    float rmnDataDiagonalLength = length(dataSize.x, dataSize.y, dataSize.z);
+    viewPointPosition.x = 0.5f * dataSize.x + 3 * rmnDataDiagonalLength * sin(rotation * pi / 180);
+    viewPointPosition.y = -0.75f * dataSize.y;// +3 * rmnDataDiagonalLength * sin(90 * pi / 180);
+    viewPointPosition.z = 0.5f * dataSize.z + 3 * rmnDataDiagonalLength * cos(rotation * pi / 180);// +3 * rmnDataDiagonalLength * cos(90 * pi / 180);
+
+    float3 viewPointDirection;
+    viewPointDirection.x = 0.5f * dataSize.x - viewPointPosition.x;
+    viewPointDirection.y = 0.5f * dataSize.y - viewPointPosition.y;
+    viewPointDirection.z = 0.5f * dataSize.z - viewPointPosition.z;
+    viewPointDirection = normalizeVector(viewPointDirection);
+
+    float3 jVersor = { 0.0f, 1.0f, 0.0f };
+    float3 viewPointParalel;
+    viewPointParalel.x = viewPointDirection.y * jVersor.z - viewPointDirection.z * jVersor.y;
+    viewPointParalel.y = viewPointDirection.z * jVersor.x - viewPointDirection.x * jVersor.z;
+    viewPointParalel.z = viewPointDirection.x * jVersor.y - viewPointDirection.y * jVersor.x;
+    viewPointParalel = normalizeVector(viewPointParalel);
+
+    float3 viewPointUp;
+    viewPointUp.x = viewPointParalel.y * viewPointDirection.z - viewPointParalel.z * viewPointDirection.y;
+    viewPointUp.y = viewPointParalel.z * viewPointDirection.x - viewPointParalel.x * viewPointDirection.z;
+    viewPointUp.z = viewPointParalel.x * viewPointDirection.y - viewPointParalel.y * viewPointDirection.x;
+    viewPointUp = normalizeVector(viewPointUp);
+
+    /* Light position */
+    float3 lightPosition;
+    lightPosition.x = 0.5f * dataSize.x;
+    lightPosition.y = -2.5f * dataSize.y;
+    lightPosition.z = 0.5f * dataSize.z;
+    lightPosition.x = -viewPointPosition.x;
+    lightPosition.y = -viewPointPosition.y;
+    lightPosition.z = -viewPointPosition.z;
+
+    float3 viewPlane = { rmnDataDiagonalLength, rmnDataDiagonalLength, 0 };
+    viewPlane.z = length(0.5f * dataSize.x - viewPointPosition.x, 0.5f * dataSize.y - viewPointPosition.y, 0.5f * dataSize.z - viewPointPosition.z);
+
+    float3 point0 = viewPointPosition;
+    float3 point1;
+
+    float3 rayDirection;
+    rayDirection.x = imageCoordonateToViewPlane(x, imageWidth, viewPlane.x);
+    rayDirection.y = imageCoordonateToViewPlane(y, imageHeight, viewPlane.y);
+    rayDirection.z = viewPlane.z;
+
+    point1.x = viewPointDirection.x * rayDirection.z + viewPointUp.x * rayDirection.y + viewPointParalel.x * rayDirection.x;
+    point1.y = viewPointDirection.y * rayDirection.z + viewPointUp.y * rayDirection.y + viewPointParalel.y * rayDirection.x;
+    point1.z = viewPointDirection.z * rayDirection.z + viewPointUp.z * rayDirection.y + viewPointParalel.z * rayDirection.x;
+    point1 = normalizeVector(point1);
+
+    int st = 0;
+    bool foundIntersection = false;
+    float tmin = 0.0f, tmax = 0.0f;
+    for (size_t k = 0; k < 6; k++)
+    {
+        /* Intersection between a line and a plane using parametric equation */
+        /* Line d : x - x1 / a = y - y1 / b = z - z1 / c and the plane P : Ax + By + Cz + D = 0; */
+        /* t = - Ax1 + By1 + Cz1 + D / Aa +Bb + Cc x|y|z = x1|y1|z1 - a|b|c * t */
+        float numerator = plane[k].x * point0.x + plane[k].y * point0.y + plane[k].z * point0.z + plane[k].w;
+        float denominator = plane[k].x * point1.x + plane[k].y * point1.y + plane[k].z * point1.z;
+
+        /* Ray is parallel or coplanar with the plane, do nothing and move on */
+        if (denominator == 0)
+        {
+            st = st < 1 ? 1 : st;
+            continue;
+        }
+
+        float t = -numerator / denominator;
+
+        //ts[6 * x + 6 * y * imageWidth + k] = t;
+
+        /* The intersection is behind the camera */
+        if (t < 0)
+        {
+            st = st < 2 ? 2 : st;
+            continue;
+        }
+
+        float3 intersectionPoint;
+        intersectionPoint.x = point0.x + point1.x * t;
+        intersectionPoint.y = point0.y + point1.y * t;
+        intersectionPoint.z = point0.z + point1.z * t;
+
+        /* Intersection outside the dataset, do nothing and move on */
+        if (intersectionPoint.x < -epsilon || intersectionPoint.x > dataSize.x + epsilon ||
+            intersectionPoint.y < -epsilon || intersectionPoint.y > dataSize.y + epsilon ||
+            intersectionPoint.z < -epsilon || intersectionPoint.z > dataSize.z + epsilon)
+        {
+            st = st < 3 ? 3 : st;
+            continue;
+        }
+
+        if (foundIntersection)
+        {
+            tmin = tmin > t ? t : tmin;
+            tmax = tmax < t ? t : tmax;
+        }
+        else
+        {
+            foundIntersection = true;
+            tmin = t;
+            tmax = t;
+        }
+    }
+
+    /* No intersection found, set the color to black */
+    if (!foundIntersection)
+    {
+        ptr[offset].x = 0;
+        ptr[offset].y = 0;
+        ptr[offset].z = 0;
+        ptr[offset].w = 255;
+
+        return;
+    }
+
+    float3 prevNormal = { 0, 0, 0 }, point, normal, light;
+    float nlcos, color[3] = { 0, 0, 0 }, c[4], value;
+    int position;
+
+    for (float t = tmax; t >= tmin; t -= step)
+    {
+        point.x = point0.x + point1.x * t;
+        point.y = point0.y + point1.y * t;
+        point.z = point0.z + point1.z * t;
+
+        value = meanPointValue(rmnData, dataSize, point);
+        position = getPositionForColormapEntryValue(value);
+        if (position < 0) continue;
+
+        c[R] = getColorValue(position, R);
+        c[G] = getColorValue(position, G);
+        c[B] = getColorValue(position, B);
+        c[A] = getColorValue(position, A);
+
+        position = pointNormal(dataSize, point);
+
+        normal.x = normals[position].x;
+        normal.y = normals[position].y;
+        normal.z = normals[position].z;
+
+        if (fabsf(normal.x) <= epsilon && fabsf(normal.y) <= epsilon && fabsf(normal.z) <= epsilon)
+        {
+            normal.x = prevNormal.x;
+            normal.y = prevNormal.y;
+            normal.z = prevNormal.z;
+        }
+        else
+        {
+            prevNormal.x = normal.x;
+            prevNormal.y = normal.y;
+            prevNormal.z = normal.z;
+        }
+
+        light.x = lightPosition.x - point.x;
+        light.y = lightPosition.y - point.y;
+        light.z = lightPosition.z - point.z;
+        light = normalizeVector(light);
+
+        nlcos = normal.x * light.x + normal.y * light.y + normal.z * light.z;
+
+        c[R] *= ambient;
+        c[G] *= ambient;
+        c[B] *= ambient;
+
+        if (nlcos > 0)
+        {
+            c[R] += c[R] * diffuse * nlcos;
+            c[G] += c[G] * diffuse * nlcos;
+            c[B] += c[B] * diffuse * nlcos;
+        }
+
+        color[R] = composeRGBA(color[R], c[R], c[A]);
+        color[G] = composeRGBA(color[G], c[G], c[A]);
+        color[B] = composeRGBA(color[B], c[B], c[A]);
+    }
+
+    ptr[offset].x = colorFloatToByte(color[R]);
+    ptr[offset].y = colorFloatToByte(color[G]);
+    ptr[offset].z = colorFloatToByte(color[B]);
+    ptr[offset].w = 255;
+}
+
+typedef struct _KernelLaunchParams
+{
+    unsigned char* dev_rmnData;
+    float3* dev_normals;
+    uint2 imageDim;
+    dim3 rmnDim;
+    unsigned int rotation;
+}KernelLaunchParams;
+
+__host__ void renderFrame(uchar4* pixels, void* parameters, int ticks)
+{
+    KernelLaunchParams* kernelParams = static_cast<KernelLaunchParams*>(parameters);
+
+    dim3 grids(imageHeigth / 8 + 1, imageWidth / 8 + 1);
+    dim3 threads(8, 8);
+
+    renderFrame << <grids, threads >> > (kernelParams->dev_rmnData, kernelParams->rmnDim, kernelParams->imageDim, kernelParams->rotation, kernelParams->dev_normals, pixels);
+
+    kernelParams->rotation += 10;
+    kernelParams->rotation %= 360;
 }
 
 int main(int argc, char** argv)
@@ -115,64 +503,288 @@ int main(int argc, char** argv)
     size_t size;
     int dev;
 
-    memset(&prop, 0, sizeof(cudaDeviceProp));
-    prop.major = 1;
-    prop.minor = 0;
+    string configFileName = "../Data/vertebra.cfg";
+    string dataFileName = "../Data/vertebra.dat";
+    string line;
+    ifstream configFile;
+    ifstream dataFile;
 
-    auto error = cudaChooseDevice(&dev, &prop);
-    if (error != cudaSuccess)
+    unsigned char* dev_rmnData;
+    float3* dev_normals;
+    cudaError cudaError;
+    size_t colorsLength = 0;
+
+    uint2 imageDim;
+    imageDim.x = imageHeigth;
+    imageDim.y = imageWidth;
+
+    dim3 subset0, subset1;
+
+    try
     {
-        std::cerr << "cudaChooseDevice failed with error code " << error << endl;
-        return 0;
+        configFile.open(configFileName);
+
+        for (getline(configFile, line); line.length() != 0; getline(configFile, line))
+        {
+            if (line.find("data_size.x") != string::npos)
+            {
+                string value = line.substr(line.find(": ") + 2, line.length());
+                istringstream stream(value);
+
+                stream >> rmnDim.x;
+            }
+
+            if (line.find("data_size.y") != string::npos)
+            {
+                string value = line.substr(line.find(": ") + 2, line.length());
+                istringstream stream(value);
+
+                stream >> rmnDim.y;
+            }
+
+            if (line.find("data_size.z") != string::npos)
+            {
+                string value = line.substr(line.find(": ") + 2, line.length());
+                istringstream stream(value);
+
+                stream >> rmnDim.z;
+            }
+
+            if (line.find("subset0.x") != string::npos)
+            {
+                string value = line.substr(line.find(": ") + 2, line.length());
+                istringstream stream(value);
+
+                stream >> subset0.x;
+            }
+
+            if (line.find("subset0.y") != string::npos)
+            {
+                string value = line.substr(line.find(": ") + 2, line.length());
+                istringstream stream(value);
+
+                stream >> subset0.y;
+            }
+
+            if (line.find("subset0.z") != string::npos)
+            {
+                string value = line.substr(line.find(": ") + 2, line.length());
+                istringstream stream(value);
+
+                stream >> subset0.z;
+            }
+
+            if (line.find("subset1.x") != string::npos)
+            {
+                string value = line.substr(line.find(": ") + 2, line.length());
+                istringstream stream(value);
+
+                stream >> subset1.x;
+            }
+
+            if (line.find("subset1.y") != string::npos)
+            {
+                string value = line.substr(line.find(": ") + 2, line.length());
+                istringstream stream(value);
+
+                stream >> subset1.y;
+            }
+
+            if (line.find("subset1.z") != string::npos)
+            {
+                string value = line.substr(line.find(": ") + 2, line.length());
+                istringstream stream(value);
+
+                stream >> subset1.z;
+            }
+
+            if (line.find("rgba") != string::npos)
+            {
+                string value = line.substr(line.find(": ") + 2, line.length());
+                istringstream stream(value);
+                float r, g, b, a;
+
+                stream >> r >> g >> b >> a;
+
+                setColorValue << <1, 1 >> > (colorsLength, R, r);
+                setColorValue << <1, 1 >> > (colorsLength, G, g);
+                setColorValue << <1, 1 >> > (colorsLength, B, b);
+                setColorValue << <1, 1 >> > (colorsLength, A, a);
+
+                colorsLength++;
+            }
+
+            if (line.find("colormap") != string::npos)
+            {
+                string value = line.substr(line.find(": ") + 2, line.length());
+                istringstream stream(value);
+                
+                vector<string> colors(istream_iterator<string>{ stream }, istream_iterator<string>());
+
+                for (size_t i = 0; i < colors.size(); i++)
+                {
+                    if (i % 2 == 0)
+                        setColormapValue << <1, 1 >> > (i / 2, stoi(colors[i]));
+                    else
+                        setColormapColor << <1, 1 >> > (i / 2, stoi(colors[i]));
+                }
+            }
+        }
+
+        //dataFile.open(dataFileName, ios::in | ios::binary);
+        //
+        //unsigned char* rmnData = new unsigned char[rmnDim.x * rmnDim.y * rmnDim.z * sizeof(unsigned char)];
+        //
+        //dataFile.read((char*)rmnData, rmnDim.x * rmnDim.y * rmnDim.z * sizeof(unsigned char));
+
+        FILE* f;
+        int actual, total, expected, x, y, k;
+        long offset;
+        dim3 ds;
+        
+        ds.x = rmnDim.x;
+        ds.y = rmnDim.y;
+        ds.z = rmnDim.z;
+
+        rmnDim.x = subset1.x - subset0.x;
+        rmnDim.y = subset1.y - subset0.y;
+        rmnDim.z = subset1.z - subset0.z;
+
+        unsigned char* rmnData = (unsigned char*)malloc(rmnDim.x * rmnDim.y * rmnDim.z * sizeof(unsigned char));
+
+        f = fopen(dataFileName.c_str(), "rb");
+        if (f == NULL)
+            throw runtime_error("fopen failed");
+
+        total = 0;
+        for (x = subset0.x; x < subset1.x; x++) 
+            for (y = subset0.y; y < subset1.y; y++)
+            {
+                offset = x * ds.y * ds.z + y * ds.z + subset0.z;
+                fseek(f, offset, SEEK_SET);
+
+                expected = rmnDim.z;
+                actual = 0;
+                while (actual < expected) {
+                    auto readBytes = fread(rmnData + total + actual, 1, expected - actual, f);
+                    if (readBytes == 0)
+                        throw runtime_error("fread failed");
+                    actual += readBytes;
+                }
+                total += actual;
+            }
+
+        fclose(f);
+
+        //int3 s;
+        //s.x = rmnDim.y * rmnDim.z;
+        //s.y = rmnDim.y;
+        //s.z = 1;
+        //
+        //for (size_t i = 0; i < rmnDim.x; i++)
+        //    for (size_t j = 0; j < rmnDim.y; j++)
+        //        for (size_t k = 0; k < rmnDim.z; k++)
+        //        {
+        //            if (rmnData[i * s.x + j * s.y + k * s.z] != 0)
+        //                printf("%d %d\n", i * s.x + j * s.y + k * s.z, rmnData[i * s.x + j * s.y + k * s.z]);
+        //        }
+
+        cudaError = cudaMalloc((void**)&dev_rmnData, rmnDim.x * rmnDim.y * rmnDim.z * sizeof(char));
+        if (cudaError != cudaSuccess)
+        {
+            cout << "cudaMallocFailed with error code " << cudaError << endl;
+            throw cudaError;
+        }
+
+        cudaError = cudaMemcpy(dev_rmnData, rmnData, rmnDim.x * rmnDim.y * rmnDim.z * sizeof(char), cudaMemcpyHostToDevice);
+        if (cudaError != cudaError::cudaSuccess)
+        {
+            std::cout << "cudaMemcpy failed with error code " << cudaError << std::endl;
+        }
+
+        cudaError = cudaMalloc((void**)&dev_normals, rmnDim.x * rmnDim.y * rmnDim.z * sizeof(float3));
+        if (cudaError != cudaSuccess)
+        {
+            cout << "cudaMallocFailed with error code " << cudaError << endl;
+            throw cudaError;
+        }
+
+        dim3 grids(rmnDim.x / 16 + 1, rmnDim.y / 16 + 1);
+        dim3 threads(16, 16);
+
+        calculateNormals << <grids, threads >> > (dev_rmnData, rmnDim, dev_normals);
+        cudaDeviceSynchronize();
+        //FILE* nFile = fopen("normals.txt", "w+");
+        //int sx = rmnDim.y * rmnDim.z;
+        //int sy = rmnDim.z;
+        //int sz = 1;
+        //float3* norm = (float3*)malloc(rmnDim.x * rmnDim.y * rmnDim.z * sizeof(float3));
+        //cudaMemcpy(norm, dev_normals, rmnDim.x * rmnDim.y * rmnDim.z * sizeof(float3), cudaMemcpyDeviceToHost);
+        //for (int i = 0; i < rmnDim.x; i++) {
+        //    for (int j = 0; j < rmnDim.y; j++) {
+        //        for (int k = 0; k < rmnDim.z; k++) {
+        //            int n = i * sx + j * sy + k * sz;
+        //
+        //            fprintf(nFile, "%d %5.3f %5.3f %5.3f\n", n, norm[n].x, norm[n].y, norm[n].z);
+        //        }
+        //    }
+        //}
+        //fclose(nFile);
+        //for (int i = 0; i < rmnDim.x; i++)
+        //{
+        //    cout << std::to_string(rmnData[i + 212 * rmnDim.x + 215 * rmnDim.x * rmnDim.y]) << " ";
+        //}
+        //cout << endl;
+    }
+    catch (exception& ex)
+    {
+        cerr << ex.what() << endl;
+    }
+    catch (...)
+    {
+        cerr << "Fatal error!" << endl;
     }
 
-    cudaGLSetGLDevice(dev);
-
-    glutInit(&argc, argv);
-    glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA);
-    glutInitWindowSize(dim, dim);
-    glutCreateWindow("bitmap");
-
-    glGenBuffers = (ProcGlGenBuffers)wglGetProcAddress("glGenBuffers");
-    glBindBuffer = (ProcGlBindBuffer)wglGetProcAddress("glBindBuffer");
-    glBufferData = (ProcGlBufferData)wglGetProcAddress("glBufferData");
-    glDeleteBuffers = (ProcGlDeleteBuffers)wglGetProcAddress("glDeleteBuffers");
-
-    glGenBuffers(1, &bufferObj);
-    glBindBuffer(GL_PIXEL_UNPACK_BUFFER_ARB, bufferObj);
-    glBufferData(GL_PIXEL_UNPACK_BUFFER_ARB, 4 * dim * dim, nullptr, GL_DYNAMIC_DRAW_ARB);
-
-    error = cudaGraphicsGLRegisterBuffer(&resource, bufferObj, cudaGraphicsMapFlagsNone);
-    if (error != cudaSuccess)
+    
+    
+    cudaError = cudaMalloc(&ts, 6 * imageHeigth * imageWidth * sizeof(float));
+    if (cudaError != cudaError::cudaSuccess)
     {
-        std::cerr << "cudaGraphicsGLRegisterBuffer failed with error code " << error << endl;
-        return 0;
+        std::cout << "cudaMemcpy failed with error code " << cudaError << std::endl;
     }
 
-    error = cudaGraphicsMapResources(1, &resource, nullptr);
-    if (error != cudaSuccess)
-    {
-        std::cerr << "cudaGraphicsMapResources failed with error code " << error << endl;
-        return 0;
-    }
-
-    error = cudaGraphicsResourceGetMappedPointer((void**)&devicePtr, &size, resource);
-    if (error != cudaSuccess)
-    {
-        std::cerr << "cudaGraphicsResourceGetMappedPointer failed with error code " << error << endl;
-        return 0;
-    }
-
-    dim3 grids(dim / 16, dim / 16);
-    dim3 threads(16, 16);
-
-    kernel << <grids, threads >> > (devicePtr);
-
-    cudaGraphicsUnmapResources(1, &resource, nullptr);
-
-    glutKeyboardFunc(key_func);
-    glutDisplayFunc(draw_func);
-    glutMainLoop();
+    KernelLaunchParams params;
+    params.dev_normals = dev_normals;
+    params.dev_rmnData = dev_rmnData;
+    params.imageDim = imageDim;
+    params.rmnDim = rmnDim;
+    params.rotation = 0;
+    
+    GpuGLAnim::animAdExit(renderFrame, nullptr, imageHeigth, imageWidth, static_cast<void*>(&params));
+    
+    //simpleCudaGreenRipple << <grids, threads >> > (devicePtr);
+    //cudaThreadExit();
+    //cudaDeviceSynchronize();
+    //float* turi = (float*)malloc(6 * imageHeigth * imageWidth * sizeof(float));
+    //cudaError = cudaMemcpy(turi, ts, 6 * imageHeigth * imageWidth * sizeof(float), cudaMemcpyDeviceToHost);
+    //if (cudaError != cudaError::cudaSuccess)
+    //{
+    //    std::cout << "cudaMemcpy failed with error code " << cudaGetErrorName(cudaError) << std::endl;
+    //}
+    //else
+    //{
+    //    std::cout << "cudaMemcpy succeded " << std::endl;
+    //}
+    //
+    //FILE* nFile = fopen("intersectionT.txt", "w+");
+    //
+    //for (int i = 0; i < imageWidth; i++) {
+    //    for (int j = 0; j < imageHeigth; j++) {
+    //        for (int k = 0; k < 6; k++)
+    //            fprintf(nFile, "%d %d %5.2f\n", i, j, turi[6 * i + 6 * j * imageWidth + k]);
+    //    }
+    //}
+    //fclose(nFile);
 
     return 0;
 }
