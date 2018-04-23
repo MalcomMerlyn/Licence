@@ -4,3 +4,4 @@ Rmn Render/x64/Release/Rmn Render.iobj
 Rmn Render/Rmn Render/intersectionT.txt
 Rmn Render/Rmn Render/normals.txt
 *.ipdb
+*.db
