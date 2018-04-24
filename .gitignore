@@ -1,0 +1,7 @@
+*.opendb
+*.db
+*.tlog
+Rmn Render/Rmn Render/intersectionT.txt
+Rmn Render/Rmn Render/normals.txt
+*.iobj
+*.ipdb
