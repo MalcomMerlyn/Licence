@@ -21,5 +21,13 @@
     <ClInclude Include="GpuGlInteropAnim.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="RmnDatasetFileLoader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="RmnDatasetFileLoader.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

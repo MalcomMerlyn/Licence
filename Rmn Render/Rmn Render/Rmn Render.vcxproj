@@ -191,6 +191,10 @@ copy "$(CudaToolkitBinDir)\cudart*.dll" "$(OutDir)"</Command>
     <ClInclude Include="CudaErrorMessage.h" />
     <ClInclude Include="GLProcedures.h" />
     <ClInclude Include="GpuGlInteropAnim.h" />
+    <ClInclude Include="RmnDatasetFileLoader.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="RmnDatasetFileLoader.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

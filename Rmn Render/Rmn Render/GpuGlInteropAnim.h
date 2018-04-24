@@ -46,65 +46,6 @@ public:
         glutMainLoop();
     }
 
-    static void s_mouse(int button, int state, int xPos, int yPos)
-    {
-        if (button == GLUT_LEFT_BUTTON)
-        {
-            if (state == GLUT_DOWN)
-            {
-                getInstance()->m_dragStartX = xPos;
-                getInstance()->m_dragStartY = yPos;
-            }
-            else if (state == GLUT_UP)
-            {
-                getInstance()->m_fClickDrag(getInstance()->m_dataBlock, getInstance()->m_dragStartX, getInstance()->m_dragStartY, xPos, yPos);
-            }
-        }
-    }
-
-    static void s_idle(void)
-    {
-        static size_t m_ticks;
-
-        cudaError error;
-        uchar4* devPtr;
-        size_t size;
-
-        error = cudaGraphicsMapResources(1, &(getInstance()->m_resource), 0);
-        if (error != cudaSuccess)
-            throw runtime_error(makeErrorMessage("cudaGraphicsMapResources", error, __FILE__, __LINE__));
-
-        error = cudaGraphicsResourceGetMappedPointer((void**)&devPtr, &size, getInstance()->m_resource);
-        if (error != cudaSuccess)
-            throw runtime_error(makeErrorMessage("cudaGraphicsResourceGetMappedPointer", error, __FILE__, __LINE__));
-
-        getInstance()->m_fGenerateFrame(devPtr, getInstance()->m_dataBlock, m_ticks++);
-
-        error = cudaGraphicsUnmapResources(1, &getInstance()->m_resource, 0);
-        if (error != cudaSuccess)
-            throw runtime_error(makeErrorMessage("cudaGraphicsUnmapResources", error, __FILE__, __LINE__));
-
-        glutPostRedisplay();
-    }
-
-    static void s_key(unsigned char key, int x, int y)
-    {
-        switch (key)
-        {
-        case 27:
-            //getInstance()->~GpuGLAnim();
-            exit(0);
-        }
-    }
-
-    static void s_draw(void)
-    {
-        glClearColor(0, 0, 0, 1);
-        glClear(GL_COLOR_BUFFER_BIT);
-        glDrawPixels(getInstance()->m_width, getInstance()->m_height, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-        glutSwapBuffers();
-    }
-
     GpuGLAnim(GpuGLAnim const&) = delete;
     void operator=(GpuGLAnim const&) = delete;
 
@@ -162,6 +103,65 @@ private:
 
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER_ARB, 0);
         glDeleteBuffers(1, &m_bufferObj);
+    }
+
+    static void s_mouse(int button, int state, int xPos, int yPos)
+    {
+        if (button == GLUT_LEFT_BUTTON)
+        {
+            if (state == GLUT_DOWN)
+            {
+                getInstance()->m_dragStartX = xPos;
+                getInstance()->m_dragStartY = yPos;
+            }
+            else if (state == GLUT_UP)
+            {
+                getInstance()->m_fClickDrag(getInstance()->m_dataBlock, getInstance()->m_dragStartX, getInstance()->m_dragStartY, xPos, yPos);
+            }
+        }
+    }
+
+    static void s_idle(void)
+    {
+        static size_t m_ticks;
+
+        cudaError error;
+        uchar4* devPtr;
+        size_t size;
+
+        error = cudaGraphicsMapResources(1, &(getInstance()->m_resource), 0);
+        if (error != cudaSuccess)
+            throw runtime_error(makeErrorMessage("cudaGraphicsMapResources", error, __FILE__, __LINE__));
+
+        error = cudaGraphicsResourceGetMappedPointer((void**)&devPtr, &size, getInstance()->m_resource);
+        if (error != cudaSuccess)
+            throw runtime_error(makeErrorMessage("cudaGraphicsResourceGetMappedPointer", error, __FILE__, __LINE__));
+
+        getInstance()->m_fGenerateFrame(devPtr, getInstance()->m_dataBlock, m_ticks++);
+
+        error = cudaGraphicsUnmapResources(1, &getInstance()->m_resource, 0);
+        if (error != cudaSuccess)
+            throw runtime_error(makeErrorMessage("cudaGraphicsUnmapResources", error, __FILE__, __LINE__));
+
+        glutPostRedisplay();
+    }
+
+    static void s_key(unsigned char key, int x, int y)
+    {
+        switch (key)
+        {
+        case 27:
+            //getInstance()->~GpuGLAnim();
+            exit(0);
+        }
+    }
+
+    static void s_draw(void)
+    {
+        glClearColor(0, 0, 0, 1);
+        glClear(GL_COLOR_BUFFER_BIT);
+        glDrawPixels(getInstance()->m_width, getInstance()->m_height, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+        glutSwapBuffers();
     }
 
     GLuint m_bufferObj;

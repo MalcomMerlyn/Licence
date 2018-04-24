@@ -35,9 +35,6 @@ using std::ios;
 using std::runtime_error;
 using std::vector;
 
-GLuint bufferObj;
-cudaGraphicsResource* resource;
-
 float* ts;
 
 dim3 rmnDim;
@@ -498,11 +495,6 @@ __host__ void renderFrame(uchar4* pixels, void* parameters, int ticks)
 
 int main(int argc, char** argv)
 {
-    cudaDeviceProp prop;
-    uchar4* devicePtr;
-    size_t size;
-    int dev;
-
     string configFileName = "../Data/vertebra.cfg";
     string dataFileName = "../Data/vertebra.dat";
     string line;
@@ -638,7 +630,7 @@ int main(int argc, char** argv)
         //dataFile.read((char*)rmnData, rmnDim.x * rmnDim.y * rmnDim.z * sizeof(unsigned char));
 
         FILE* f;
-        int actual, total, expected, x, y, k;
+        int actual, total, expected, x, y;
         long offset;
         dim3 ds;
         
