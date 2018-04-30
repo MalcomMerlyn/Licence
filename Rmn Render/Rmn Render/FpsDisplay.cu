@@ -43,19 +43,19 @@ FpsDisplay::FpsDisplay(uint2 imageDim) :
 
     error = cudaMalloc((void**)&m_devDigits, NumberOfDigits * DigitHeight * DigitWidth * sizeof(char));
     if (error != cudaSuccess)
-        throw runtime_error(makeErrorMessage("cudaMalloc", error, __FILE__, __LINE__));
+        throw runtime_error(makeCudaErrorMessage("cudaMalloc", error, __FILE__, __LINE__));
 
     error = cudaMemcpy(m_devDigits, m_digits, NumberOfDigits * DigitHeight * DigitWidth * sizeof(char), cudaMemcpyHostToDevice);
     if (error != cudaSuccess)
-        throw runtime_error(makeErrorMessage("cudaMemcpy", error, __FILE__, __LINE__));
+        throw runtime_error(makeCudaErrorMessage("cudaMemcpy", error, __FILE__, __LINE__));
 
     error = cudaMalloc((void**)&m_devPoint, DigitHeight * PointWidth * sizeof(char));
     if (error != cudaSuccess)
-        throw runtime_error(makeErrorMessage("cudaMalloc", error, __FILE__, __LINE__));
+        throw runtime_error(makeCudaErrorMessage("cudaMalloc", error, __FILE__, __LINE__));
 
     error = cudaMemcpy(m_devPoint, m_point, DigitHeight * PointWidth * sizeof(char), cudaMemcpyHostToDevice);
     if (error != cudaSuccess)
-        throw runtime_error(makeErrorMessage("cudaMemcpy", error, __FILE__, __LINE__));
+        throw runtime_error(makeCudaErrorMessage("cudaMemcpy", error, __FILE__, __LINE__));
 }
 
 void FpsDisplay::displayFps(uchar4* pixels, float fps)

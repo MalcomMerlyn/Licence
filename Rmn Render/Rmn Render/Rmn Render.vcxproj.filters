@@ -33,5 +33,13 @@
     <ClInclude Include="VisualStudioCompilerErrors.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="ErrnoErrorMessage.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="RmnDatasetFileLoader.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

@@ -43,10 +43,10 @@ static void LoadAndExecuteProcGlDeleteBuffers(GLsizei n, const GLuint* buffers)
     glDeleteBuffers(n, buffers);
 }
 
-static ProcGlGenBuffers glGenBuffers = LoadAndExecuteProcGlGenBuffers;
-static ProcGlBindBuffer glBindBuffer = LoadAndExecuteProcGlBindBuffer;
-static ProcGlBufferData glBufferData = LoadAndExecuteProcGlBufferData;
-static ProcGlDeleteBuffers glDeleteBuffers = LoadAndExecuteProcGlDeleteBuffers;
+ProcGlGenBuffers glGenBuffers = LoadAndExecuteProcGlGenBuffers;
+ProcGlBindBuffer glBindBuffer = LoadAndExecuteProcGlBindBuffer;
+ProcGlBufferData glBufferData = LoadAndExecuteProcGlBufferData;
+ProcGlDeleteBuffers glDeleteBuffers = LoadAndExecuteProcGlDeleteBuffers;
 
 #ifndef GL_ARB_pixel_buffer_object
 #define GL_PIXEL_PACK_BUFFER_ARB            0x88EB
