@@ -5,8 +5,9 @@
 #include "cuda_gl_interop.h"
 #include "device_launch_parameters.h"
 
-#include "CudaErrorMessage.h"
 #include "GpuGlInteropAnim.h"
+#include "RmnDatasetFileLoader.h"
+#include "FpsDisplay.h"
 
 #include <stdio.h>
 
@@ -35,17 +36,14 @@ using std::ios;
 using std::runtime_error;
 using std::vector;
 
-GLuint bufferObj;
-cudaGraphicsResource* resource;
-
-float* ts;
-
 dim3 rmnDim;
 
 unsigned int imageHeigth = 512;
 unsigned int imageWidth = 512;
 
 const int dim = 512;
+
+FpsDisplay fpsDisplay({imageHeigth, imageWidth});
 
 __device__ float4 colors[10];
 __device__ uint2 colormap[10];
@@ -113,38 +111,6 @@ __global__ void simpleCudaGreenRipple(uchar4* ptr)
     ptr[offset].y = 0;
     ptr[offset].z = 0;
     ptr[offset].w = 255;
-}
-
-__global__ void simpleFrontRenderer(char* rmnData, size_t xDim, size_t yDim, size_t zDim, uchar4* ptr)
-{
-    int x = blockIdx.x;
-    int y = blockIdx.y;
-    int offset = x + y * gridDim.x;
-
-    int opacity = 0;
-
-    ptr[offset].x = 0;
-    ptr[offset].y = 0;
-    ptr[offset].z = 0;
-    ptr[offset].w = 255;
-
-    for (int i = 25; i < 26; i++)
-    { 
-        if (rmnData[i + x * xDim + y * xDim * yDim] != 0)
-            opacity += rmnData[i + x * xDim + y * xDim * yDim];
-
-        if (rmnData[i + x * xDim + y * xDim * yDim] == 0)
-            opacity = 0;
-    
-        if (opacity >= 1)
-        {
-            ptr[offset].x = 255;
-            ptr[offset].y = 0;
-            ptr[offset].z = 0;
-    
-            return;
-        }
-    } 
 }
 
 __device__ int pointNormal(dim3 dataSize, float3 point)
@@ -483,231 +449,80 @@ typedef struct _KernelLaunchParams
     unsigned int rotation;
 }KernelLaunchParams;
 
+cudaEvent_t start, stop;
+
 __host__ void renderFrame(uchar4* pixels, void* parameters, int ticks)
 {
     KernelLaunchParams* kernelParams = static_cast<KernelLaunchParams*>(parameters);
 
-    dim3 grids(imageHeigth / 8 + 1, imageWidth / 8 + 1);
-    dim3 threads(8, 8);
+    dim3 threads(8, 16);
+    dim3 grids(imageHeigth / threads.x + 1, imageWidth / threads.y + 1);
+
+    cudaEventRecord(start);
 
     renderFrame << <grids, threads >> > (kernelParams->dev_rmnData, kernelParams->rmnDim, kernelParams->imageDim, kernelParams->rotation, kernelParams->dev_normals, pixels);
 
-    kernelParams->rotation += 10;
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+
+    float milliseconds = 0;
+    cudaEventElapsedTime(&milliseconds, start, stop);
+    
+    float fps = 1000 / milliseconds;
+    fpsDisplay.displayFps(pixels, fps);
+    
+    kernelParams->rotation += 1;
     kernelParams->rotation %= 360;
 }
 
 int main(int argc, char** argv)
 {
-    cudaDeviceProp prop;
-    uchar4* devicePtr;
-    size_t size;
-    int dev;
-
-    string configFileName = "../Data/vertebra.cfg";
-    string dataFileName = "../Data/vertebra.dat";
-    string line;
-    ifstream configFile;
-    ifstream dataFile;
+    RmnDatasetFileLoader rmnDatasetFileLoader("../Data", "vertebra");
 
     unsigned char* dev_rmnData;
     float3* dev_normals;
     cudaError cudaError;
-    size_t colorsLength = 0;
 
     uint2 imageDim;
     imageDim.x = imageHeigth;
     imageDim.y = imageWidth;
 
-    dim3 subset0, subset1;
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
 
     try
     {
-        configFile.open(configFileName);
+        rmnDatasetFileLoader.loadDataset();
 
-        for (getline(configFile, line); line.length() != 0; getline(configFile, line))
+        for (size_t c = 0; c < rmnDatasetFileLoader.getColor().size(); c++)
         {
-            if (line.find("data_size.x") != string::npos)
-            {
-                string value = line.substr(line.find(": ") + 2, line.length());
-                istringstream stream(value);
-
-                stream >> rmnDim.x;
-            }
-
-            if (line.find("data_size.y") != string::npos)
-            {
-                string value = line.substr(line.find(": ") + 2, line.length());
-                istringstream stream(value);
-
-                stream >> rmnDim.y;
-            }
-
-            if (line.find("data_size.z") != string::npos)
-            {
-                string value = line.substr(line.find(": ") + 2, line.length());
-                istringstream stream(value);
-
-                stream >> rmnDim.z;
-            }
-
-            if (line.find("subset0.x") != string::npos)
-            {
-                string value = line.substr(line.find(": ") + 2, line.length());
-                istringstream stream(value);
-
-                stream >> subset0.x;
-            }
-
-            if (line.find("subset0.y") != string::npos)
-            {
-                string value = line.substr(line.find(": ") + 2, line.length());
-                istringstream stream(value);
-
-                stream >> subset0.y;
-            }
-
-            if (line.find("subset0.z") != string::npos)
-            {
-                string value = line.substr(line.find(": ") + 2, line.length());
-                istringstream stream(value);
-
-                stream >> subset0.z;
-            }
-
-            if (line.find("subset1.x") != string::npos)
-            {
-                string value = line.substr(line.find(": ") + 2, line.length());
-                istringstream stream(value);
-
-                stream >> subset1.x;
-            }
-
-            if (line.find("subset1.y") != string::npos)
-            {
-                string value = line.substr(line.find(": ") + 2, line.length());
-                istringstream stream(value);
-
-                stream >> subset1.y;
-            }
-
-            if (line.find("subset1.z") != string::npos)
-            {
-                string value = line.substr(line.find(": ") + 2, line.length());
-                istringstream stream(value);
-
-                stream >> subset1.z;
-            }
-
-            if (line.find("rgba") != string::npos)
-            {
-                string value = line.substr(line.find(": ") + 2, line.length());
-                istringstream stream(value);
-                float r, g, b, a;
-
-                stream >> r >> g >> b >> a;
-
-                setColorValue << <1, 1 >> > (colorsLength, R, r);
-                setColorValue << <1, 1 >> > (colorsLength, G, g);
-                setColorValue << <1, 1 >> > (colorsLength, B, b);
-                setColorValue << <1, 1 >> > (colorsLength, A, a);
-
-                colorsLength++;
-            }
-
-            if (line.find("colormap") != string::npos)
-            {
-                string value = line.substr(line.find(": ") + 2, line.length());
-                istringstream stream(value);
-                
-                vector<string> colors(istream_iterator<string>{ stream }, istream_iterator<string>());
-
-                for (size_t i = 0; i < colors.size(); i++)
-                {
-                    if (i % 2 == 0)
-                        setColormapValue << <1, 1 >> > (i / 2, stoi(colors[i]));
-                    else
-                        setColormapColor << <1, 1 >> > (i / 2, stoi(colors[i]));
-                }
-            }
+            setColorValue << <1, 1 >> > (c, R, rmnDatasetFileLoader.getColor()[c].r);
+            setColorValue << <1, 1 >> > (c, G, rmnDatasetFileLoader.getColor()[c].g);
+            setColorValue << <1, 1 >> > (c, B, rmnDatasetFileLoader.getColor()[c].b);
+            setColorValue << <1, 1 >> > (c, A, rmnDatasetFileLoader.getColor()[c].a);
         }
 
-        //dataFile.open(dataFileName, ios::in | ios::binary);
-        //
-        //unsigned char* rmnData = new unsigned char[rmnDim.x * rmnDim.y * rmnDim.z * sizeof(unsigned char)];
-        //
-        //dataFile.read((char*)rmnData, rmnDim.x * rmnDim.y * rmnDim.z * sizeof(unsigned char));
+        for (size_t c = 0; c < rmnDatasetFileLoader.getColormap().size(); c++)
+        {
+            if (c % 2 == 0)
+                setColormapValue << <1, 1 >> > (c / 2, rmnDatasetFileLoader.getColormap()[c]);
+            else
+                setColormapColor << <1, 1 >> > (c / 2, rmnDatasetFileLoader.getColormap()[c]);
+        }
 
-        FILE* f;
-        int actual, total, expected, x, y, k;
-        long offset;
-        dim3 ds;
-        
-        ds.x = rmnDim.x;
-        ds.y = rmnDim.y;
-        ds.z = rmnDim.z;
-
-        rmnDim.x = subset1.x - subset0.x;
-        rmnDim.y = subset1.y - subset0.y;
-        rmnDim.z = subset1.z - subset0.z;
-
-        unsigned char* rmnData = (unsigned char*)malloc(rmnDim.x * rmnDim.y * rmnDim.z * sizeof(unsigned char));
-
-        f = fopen(dataFileName.c_str(), "rb");
-        if (f == NULL)
-            throw runtime_error("fopen failed");
-
-        total = 0;
-        for (x = subset0.x; x < subset1.x; x++) 
-            for (y = subset0.y; y < subset1.y; y++)
-            {
-                offset = x * ds.y * ds.z + y * ds.z + subset0.z;
-                fseek(f, offset, SEEK_SET);
-
-                expected = rmnDim.z;
-                actual = 0;
-                while (actual < expected) {
-                    auto readBytes = fread(rmnData + total + actual, 1, expected - actual, f);
-                    if (readBytes == 0)
-                        throw runtime_error("fread failed");
-                    actual += readBytes;
-                }
-                total += actual;
-            }
-
-        fclose(f);
-
-        //int3 s;
-        //s.x = rmnDim.y * rmnDim.z;
-        //s.y = rmnDim.y;
-        //s.z = 1;
-        //
-        //for (size_t i = 0; i < rmnDim.x; i++)
-        //    for (size_t j = 0; j < rmnDim.y; j++)
-        //        for (size_t k = 0; k < rmnDim.z; k++)
-        //        {
-        //            if (rmnData[i * s.x + j * s.y + k * s.z] != 0)
-        //                printf("%d %d\n", i * s.x + j * s.y + k * s.z, rmnData[i * s.x + j * s.y + k * s.z]);
-        //        }
+        rmnDim = rmnDatasetFileLoader.getRmnDatasetDimensions();
 
         cudaError = cudaMalloc((void**)&dev_rmnData, rmnDim.x * rmnDim.y * rmnDim.z * sizeof(char));
         if (cudaError != cudaSuccess)
-        {
-            cout << "cudaMallocFailed with error code " << cudaError << endl;
-            throw cudaError;
-        }
+            throw runtime_error(makeCudaErrorMessage("cudaMalloc", cudaError, __FILE__, __LINE__));
 
-        cudaError = cudaMemcpy(dev_rmnData, rmnData, rmnDim.x * rmnDim.y * rmnDim.z * sizeof(char), cudaMemcpyHostToDevice);
+        cudaError = cudaMemcpy(dev_rmnData, rmnDatasetFileLoader.getRmnDataset(), rmnDim.x * rmnDim.y * rmnDim.z * sizeof(char), cudaMemcpyHostToDevice);
         if (cudaError != cudaError::cudaSuccess)
-        {
-            std::cout << "cudaMemcpy failed with error code " << cudaError << std::endl;
-        }
+            throw runtime_error(makeCudaErrorMessage("cudaMemcpy", cudaError, __FILE__, __LINE__));
 
         cudaError = cudaMalloc((void**)&dev_normals, rmnDim.x * rmnDim.y * rmnDim.z * sizeof(float3));
         if (cudaError != cudaSuccess)
-        {
-            cout << "cudaMallocFailed with error code " << cudaError << endl;
-            throw cudaError;
-        }
+            throw runtime_error(makeCudaErrorMessage("cudaMalloc", cudaError, __FILE__, __LINE__));
 
         dim3 grids(rmnDim.x / 16 + 1, rmnDim.y / 16 + 1);
         dim3 threads(16, 16);
@@ -745,14 +560,6 @@ int main(int argc, char** argv)
         cerr << "Fatal error!" << endl;
     }
 
-    
-    
-    cudaError = cudaMalloc(&ts, 6 * imageHeigth * imageWidth * sizeof(float));
-    if (cudaError != cudaError::cudaSuccess)
-    {
-        std::cout << "cudaMemcpy failed with error code " << cudaError << std::endl;
-    }
-
     KernelLaunchParams params;
     params.dev_normals = dev_normals;
     params.dev_rmnData = dev_rmnData;
@@ -762,9 +569,6 @@ int main(int argc, char** argv)
     
     GpuGLAnim::animAdExit(renderFrame, nullptr, imageHeigth, imageWidth, static_cast<void*>(&params));
     
-    //simpleCudaGreenRipple << <grids, threads >> > (devicePtr);
-    //cudaThreadExit();
-    //cudaDeviceSynchronize();
     //float* turi = (float*)malloc(6 * imageHeigth * imageWidth * sizeof(float));
     //cudaError = cudaMemcpy(turi, ts, 6 * imageHeigth * imageWidth * sizeof(float), cudaMemcpyDeviceToHost);
     //if (cudaError != cudaError::cudaSuccess)

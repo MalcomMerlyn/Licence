@@ -46,6 +46,65 @@ public:
         glutMainLoop();
     }
 
+    GpuGLAnim(GpuGLAnim const&) = delete;
+    void operator=(GpuGLAnim const&) = delete;
+
+private:
+    GpuGLAnim(int width, int height, void* dataBlock = nullptr)
+    {
+        m_width = width;
+        m_height = height;
+        m_dataBlock = dataBlock;
+        m_fClickDrag = nullptr;
+
+        cudaDeviceProp prop;
+        int dev;
+        cudaError error;
+        memset(&prop, 0, sizeof(cudaDeviceProp));
+        prop.minor = 0;
+        prop.major = 1;
+        error = cudaChooseDevice(&dev, &prop);
+        if (error != cudaSuccess)
+            throw runtime_error(makeCudaErrorMessage("cudaChooseDevice", error, __FILE__, __LINE__));
+
+        int argc = 1;
+        char* argv = "GpuGLAnim";
+        glutInit(&argc, &argv);
+        glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA);
+        glutInitWindowSize(width, height);
+        glutCreateWindow("bitmap");
+
+        glGenBuffers(1, &m_bufferObj);
+        glBindBuffer(GL_PIXEL_UNPACK_BUFFER_ARB, m_bufferObj);
+        glBufferData(GL_PIXEL_UNPACK_BUFFER_ARB, width * height * sizeof(uchar4), nullptr, GL_DYNAMIC_DRAW_ARB);
+
+        error = cudaGraphicsGLRegisterBuffer(&m_resource, m_bufferObj, cudaGraphicsMapFlagsNone);
+        if (error != cudaSuccess)
+            throw runtime_error(makeCudaErrorMessage("cudaGraphicsGLRegisterBuffer", error, __FILE__, __LINE__));
+    }
+
+    inline static GpuGLAnim** getInstancePointer()
+    {
+        static GpuGLAnim* instance;
+
+        return &instance;
+    }
+
+    inline static GpuGLAnim* getInstance()
+    {
+        return *getInstancePointer();
+    }
+
+    ~GpuGLAnim()
+    {
+        cudaError error = cudaGraphicsUnregisterResource(m_resource);
+        if (error != cudaSuccess)
+            cerr << makeCudaErrorMessage("cudaGraphicsUnregisterResource", error, __FILE__, __LINE__) << endl;
+
+        glBindBuffer(GL_PIXEL_UNPACK_BUFFER_ARB, 0);
+        glDeleteBuffers(1, &m_bufferObj);
+    }
+
     static void s_mouse(int button, int state, int xPos, int yPos)
     {
         if (button == GLUT_LEFT_BUTTON)
@@ -72,17 +131,17 @@ public:
 
         error = cudaGraphicsMapResources(1, &(getInstance()->m_resource), 0);
         if (error != cudaSuccess)
-            throw runtime_error(makeErrorMessage("cudaGraphicsMapResources", error, __FILE__, __LINE__));
+            throw runtime_error(makeCudaErrorMessage("cudaGraphicsMapResources", error, __FILE__, __LINE__));
 
         error = cudaGraphicsResourceGetMappedPointer((void**)&devPtr, &size, getInstance()->m_resource);
         if (error != cudaSuccess)
-            throw runtime_error(makeErrorMessage("cudaGraphicsResourceGetMappedPointer", error, __FILE__, __LINE__));
+            throw runtime_error(makeCudaErrorMessage("cudaGraphicsResourceGetMappedPointer", error, __FILE__, __LINE__));
 
         getInstance()->m_fGenerateFrame(devPtr, getInstance()->m_dataBlock, m_ticks++);
 
         error = cudaGraphicsUnmapResources(1, &getInstance()->m_resource, 0);
         if (error != cudaSuccess)
-            throw runtime_error(makeErrorMessage("cudaGraphicsUnmapResources", error, __FILE__, __LINE__));
+            throw runtime_error(makeCudaErrorMessage("cudaGraphicsUnmapResources", error, __FILE__, __LINE__));
 
         glutPostRedisplay();
     }
@@ -103,65 +162,6 @@ public:
         glClear(GL_COLOR_BUFFER_BIT);
         glDrawPixels(getInstance()->m_width, getInstance()->m_height, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
         glutSwapBuffers();
-    }
-
-    GpuGLAnim(GpuGLAnim const&) = delete;
-    void operator=(GpuGLAnim const&) = delete;
-
-private:
-    GpuGLAnim(int width, int height, void* dataBlock = nullptr)
-    {
-        m_width = width;
-        m_height = height;
-        m_dataBlock = dataBlock;
-        m_fClickDrag = nullptr;
-
-        cudaDeviceProp prop;
-        int dev;
-        cudaError error;
-        memset(&prop, 0, sizeof(cudaDeviceProp));
-        prop.minor = 0;
-        prop.major = 1;
-        error = cudaChooseDevice(&dev, &prop);
-        if (error != cudaSuccess)
-            throw runtime_error(makeErrorMessage("cudaChooseDevice", error, __FILE__, __LINE__));
-
-        int argc = 1;
-        char* argv = "GpuGLAnim";
-        glutInit(&argc, &argv);
-        glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA);
-        glutInitWindowSize(width, height);
-        glutCreateWindow("bitmap");
-
-        glGenBuffers(1, &m_bufferObj);
-        glBindBuffer(GL_PIXEL_UNPACK_BUFFER_ARB, m_bufferObj);
-        glBufferData(GL_PIXEL_UNPACK_BUFFER_ARB, width * height * sizeof(uchar4), nullptr, GL_DYNAMIC_DRAW_ARB);
-
-        error = cudaGraphicsGLRegisterBuffer(&m_resource, m_bufferObj, cudaGraphicsMapFlagsNone);
-        if (error != cudaSuccess)
-            throw runtime_error(makeErrorMessage("cudaGraphicsGLRegisterBuffer", error, __FILE__, __LINE__));
-    }
-
-    inline static GpuGLAnim** getInstancePointer()
-    {
-        static GpuGLAnim* instance;
-
-        return &instance;
-    }
-
-    inline static GpuGLAnim* getInstance()
-    {
-        return *getInstancePointer();
-    }
-
-    ~GpuGLAnim()
-    {
-        cudaError error = cudaGraphicsUnregisterResource(m_resource);
-        if (error != cudaSuccess)
-            cerr << makeErrorMessage("cudaGraphicsUnregisterResource", error, __FILE__, __LINE__) << endl;
-
-        glBindBuffer(GL_PIXEL_UNPACK_BUFFER_ARB, 0);
-        glDeleteBuffers(1, &m_bufferObj);
     }
 
     GLuint m_bufferObj;
