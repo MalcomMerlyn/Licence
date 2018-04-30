@@ -36,8 +36,6 @@ using std::ios;
 using std::runtime_error;
 using std::vector;
 
-float* ts;
-
 dim3 rmnDim;
 
 unsigned int imageHeigth = 512;
@@ -481,26 +479,13 @@ int main(int argc, char** argv)
 {
     RmnDatasetFileLoader rmnDatasetFileLoader("../Data", "vertebra");
 
-    cudaDeviceProp prop;
-    uchar4* devicePtr;
-    int dev;
-
-    string configFileName = "../Data/vertebra.cfg";
-    string dataFileName = "../Data/vertebra.dat";
-    string line;
-    ifstream configFile;
-    ifstream dataFile;
-
     unsigned char* dev_rmnData;
     float3* dev_normals;
     cudaError cudaError;
-    size_t colorsLength = 0;
 
     uint2 imageDim;
     imageDim.x = imageHeigth;
     imageDim.y = imageWidth;
-
-    dim3 subset0, subset1;
 
     cudaEventCreate(&start);
     cudaEventCreate(&stop);
@@ -525,40 +510,19 @@ int main(int argc, char** argv)
                 setColormapColor << <1, 1 >> > (c / 2, rmnDatasetFileLoader.getColormap()[c]);
         }
 
-        //int3 s;
-        //s.x = rmnDim.y * rmnDim.z;
-        //s.y = rmnDim.y;
-        //s.z = 1;
-        //
-        //for (size_t i = 0; i < rmnDim.x; i++)
-        //    for (size_t j = 0; j < rmnDim.y; j++)
-        //        for (size_t k = 0; k < rmnDim.z; k++)
-        //        {
-        //            if (rmnData[i * s.x + j * s.y + k * s.z] != 0)
-        //                printf("%d %d\n", i * s.x + j * s.y + k * s.z, rmnData[i * s.x + j * s.y + k * s.z]);
-        //        }
-
         rmnDim = rmnDatasetFileLoader.getRmnDatasetDimensions();
 
         cudaError = cudaMalloc((void**)&dev_rmnData, rmnDim.x * rmnDim.y * rmnDim.z * sizeof(char));
         if (cudaError != cudaSuccess)
-        {
-            cout << "cudaMallocFailed with error code " << cudaError << endl;
-            throw cudaError;
-        }
+            throw runtime_error(makeCudaErrorMessage("cudaMalloc", cudaError, __FILE__, __LINE__));
 
         cudaError = cudaMemcpy(dev_rmnData, rmnDatasetFileLoader.getRmnDataset(), rmnDim.x * rmnDim.y * rmnDim.z * sizeof(char), cudaMemcpyHostToDevice);
         if (cudaError != cudaError::cudaSuccess)
-        {
-            std::cout << makeCudaErrorMessage(cudaError) << std::endl;
-        }
+            throw runtime_error(makeCudaErrorMessage("cudaMemcpy", cudaError, __FILE__, __LINE__));
 
         cudaError = cudaMalloc((void**)&dev_normals, rmnDim.x * rmnDim.y * rmnDim.z * sizeof(float3));
         if (cudaError != cudaSuccess)
-        {
-            cout << "cudaMallocFailed with error code " << cudaError << endl;
-            throw cudaError;
-        }
+            throw runtime_error(makeCudaErrorMessage("cudaMalloc", cudaError, __FILE__, __LINE__));
 
         dim3 grids(rmnDim.x / 16 + 1, rmnDim.y / 16 + 1);
         dim3 threads(16, 16);
@@ -595,12 +559,6 @@ int main(int argc, char** argv)
     {
         cerr << "Fatal error!" << endl;
     }
-       
-    cudaError = cudaMalloc(&ts, 6 * imageHeigth * imageWidth * sizeof(float));
-    if (cudaError != cudaError::cudaSuccess)
-    {
-        std::cout << "cudaMemcpy failed with error code " << cudaError << std::endl;
-    }
 
     KernelLaunchParams params;
     params.dev_normals = dev_normals;
@@ -611,9 +569,6 @@ int main(int argc, char** argv)
     
     GpuGLAnim::animAdExit(renderFrame, nullptr, imageHeigth, imageWidth, static_cast<void*>(&params));
     
-    //simpleCudaGreenRipple << <grids, threads >> > (devicePtr);
-    //cudaThreadExit();
-    //cudaDeviceSynchronize();
     //float* turi = (float*)malloc(6 * imageHeigth * imageWidth * sizeof(float));
     //cudaError = cudaMemcpy(turi, ts, 6 * imageHeigth * imageWidth * sizeof(float), cudaMemcpyDeviceToHost);
     //if (cudaError != cudaError::cudaSuccess)

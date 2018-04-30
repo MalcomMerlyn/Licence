@@ -80,6 +80,7 @@ void RmnDatasetFileLoader::loadRmnDataset()
     int actual, total, expected, x, y;
     long offset;
     dim3 datasetDim;
+    errno_t error;
 
     datasetDim.x = m_rmnDim.x;
     datasetDim.y = m_rmnDim.y;
@@ -93,7 +94,7 @@ void RmnDatasetFileLoader::loadRmnDataset()
     if (m_rmnDataset == nullptr)
         throw runtime_error(makeErrnoErrorMessage("malloc", __FILE__, __LINE__));
 
-    f = fopen(m_dataFileName.c_str(), "rb");
+    fopen_s(&f, m_dataFileName.c_str(), "rb");
     if (f == nullptr)
         throw runtime_error(makeErrnoErrorMessage("fopen", __FILE__, __LINE__));
 
@@ -115,7 +116,7 @@ void RmnDatasetFileLoader::loadRmnDataset()
                 if (readBytes == 0)
                     throw runtime_error(makeErrnoErrorMessage("fread", __FILE__, __LINE__));
 
-                actual += readBytes;
+                actual += static_cast<int>(readBytes);
             }
             total += actual;
         }
