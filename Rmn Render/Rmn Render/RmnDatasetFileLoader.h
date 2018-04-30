@@ -1,4 +1,5 @@
-#ifndef RMN_DATASET_FILE_LOADER
+#ifndef RMN_DATASET_FILE_LOADER_H_
+#define RMN_DATASET_FILE_LOADER_H_
 
 #include "cuda.h"
 #include "cuda_runtime.h"
@@ -6,7 +7,6 @@
 #include "ErrnoErrorMessage.h"
 
 #include <exception>
-#include <iostream>
 #include <iterator>
 #include <fstream>
 #include <sstream>
@@ -25,13 +25,13 @@ using std::vector;
 
 struct Color
 {
-    Color(unsigned int r, unsigned int g, unsigned int b, unsigned int a)
+    Color(float r, float g, float b, float a)
         : r{ r }, g{ g }, b{ b }, a{ a }
     { }
 
     ~Color() { }
 
-    unsigned int r, g, b, a;
+    float r, g, b, a;
 };
 
 class RmnDatasetFileLoader

@@ -60,7 +60,7 @@ FpsDisplay::FpsDisplay(uint2 imageDim) :
 
 void FpsDisplay::displayFps(uchar4* pixels, float fps)
 {
-    unsigned int fps100 = fps * 100;
+    unsigned int fps100 = static_cast<unsigned int>(fps * 100);
     size_t digit, position = 2;
     
     digit = fps100 % 10;

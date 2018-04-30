@@ -13,9 +13,6 @@
 
 #include <exception>
 #include <iostream>
-#include <iterator>
-#include <fstream>
-#include <sstream>
 #include <vector>
 
 #define R 0
@@ -28,11 +25,7 @@ using std::cerr;
 using std::endl;
 using std::getline;
 using std::exception;
-using std::ifstream;
-using std::istringstream;
-using std::istream_iterator;
 using std::string;
-using std::ios;
 using std::runtime_error;
 using std::vector;
 
@@ -451,7 +444,7 @@ typedef struct _KernelLaunchParams
 
 cudaEvent_t start, stop;
 
-__host__ void renderFrame(uchar4* pixels, void* parameters, int ticks)
+__host__ void renderFrame(uchar4* pixels, void* parameters, size_t ticks)
 {
     KernelLaunchParams* kernelParams = static_cast<KernelLaunchParams*>(parameters);
 
@@ -487,11 +480,16 @@ int main(int argc, char** argv)
     imageDim.x = imageHeigth;
     imageDim.y = imageWidth;
 
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
-
     try
     {
+        cudaError = cudaEventCreate(&start);
+        if (cudaError != cudaSuccess)
+            throw runtime_error(makeCudaErrorMessage("cudaEventCreate", cudaError, __FILE__, __LINE__));
+
+        cudaError = cudaEventCreate(&stop);
+        if (cudaError != cudaSuccess)
+            throw runtime_error(makeCudaErrorMessage("cudaEventCreate", cudaError, __FILE__, __LINE__));
+
         rmnDatasetFileLoader.loadDataset();
 
         for (size_t c = 0; c < rmnDatasetFileLoader.getColor().size(); c++)
@@ -529,27 +527,15 @@ int main(int argc, char** argv)
 
         calculateNormals << <grids, threads >> > (dev_rmnData, rmnDim, dev_normals);
         cudaDeviceSynchronize();
-        //FILE* nFile = fopen("normals.txt", "w+");
-        //int sx = rmnDim.y * rmnDim.z;
-        //int sy = rmnDim.z;
-        //int sz = 1;
-        //float3* norm = (float3*)malloc(rmnDim.x * rmnDim.y * rmnDim.z * sizeof(float3));
-        //cudaMemcpy(norm, dev_normals, rmnDim.x * rmnDim.y * rmnDim.z * sizeof(float3), cudaMemcpyDeviceToHost);
-        //for (int i = 0; i < rmnDim.x; i++) {
-        //    for (int j = 0; j < rmnDim.y; j++) {
-        //        for (int k = 0; k < rmnDim.z; k++) {
-        //            int n = i * sx + j * sy + k * sz;
-        //
-        //            fprintf(nFile, "%d %5.3f %5.3f %5.3f\n", n, norm[n].x, norm[n].y, norm[n].z);
-        //        }
-        //    }
-        //}
-        //fclose(nFile);
-        //for (int i = 0; i < rmnDim.x; i++)
-        //{
-        //    cout << std::to_string(rmnData[i + 212 * rmnDim.x + 215 * rmnDim.x * rmnDim.y]) << " ";
-        //}
-        //cout << endl;
+
+        KernelLaunchParams params;
+        params.dev_normals = dev_normals;
+        params.dev_rmnData = dev_rmnData;
+        params.imageDim = imageDim;
+        params.rmnDim = rmnDim;
+        params.rotation = 0;
+
+        GpuGLAnim::animAdExit(renderFrame, nullptr, imageHeigth, imageWidth, static_cast<void*>(&params));
     }
     catch (exception& ex)
     {
@@ -559,36 +545,6 @@ int main(int argc, char** argv)
     {
         cerr << "Fatal error!" << endl;
     }
-
-    KernelLaunchParams params;
-    params.dev_normals = dev_normals;
-    params.dev_rmnData = dev_rmnData;
-    params.imageDim = imageDim;
-    params.rmnDim = rmnDim;
-    params.rotation = 0;
     
-    GpuGLAnim::animAdExit(renderFrame, nullptr, imageHeigth, imageWidth, static_cast<void*>(&params));
-    
-    //float* turi = (float*)malloc(6 * imageHeigth * imageWidth * sizeof(float));
-    //cudaError = cudaMemcpy(turi, ts, 6 * imageHeigth * imageWidth * sizeof(float), cudaMemcpyDeviceToHost);
-    //if (cudaError != cudaError::cudaSuccess)
-    //{
-    //    std::cout << "cudaMemcpy failed with error code " << cudaGetErrorName(cudaError) << std::endl;
-    //}
-    //else
-    //{
-    //    std::cout << "cudaMemcpy succeded " << std::endl;
-    //}
-    //
-    //FILE* nFile = fopen("intersectionT.txt", "w+");
-    //
-    //for (int i = 0; i < imageWidth; i++) {
-    //    for (int j = 0; j < imageHeigth; j++) {
-    //        for (int k = 0; k < 6; k++)
-    //            fprintf(nFile, "%d %d %5.2f\n", i, j, turi[6 * i + 6 * j * imageWidth + k]);
-    //    }
-    //}
-    //fclose(nFile);
-
     return 0;
 }

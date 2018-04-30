@@ -76,11 +76,11 @@ void RmnDatasetFileLoader::loadConfigurationData()
 
 void RmnDatasetFileLoader::loadRmnDataset()
 {
-    FILE* f;
-    int actual, total, expected, x, y;
+    FILE* datasetFile;
+    int actual, total, expected;
+    unsigned int x, y;
     long offset;
     dim3 datasetDim;
-    errno_t error;
 
     datasetDim.x = m_rmnDim.x;
     datasetDim.y = m_rmnDim.y;
@@ -90,12 +90,12 @@ void RmnDatasetFileLoader::loadRmnDataset()
     m_rmnDim.y = m_subset1.y - m_subset0.y;
     m_rmnDim.z = m_subset1.z - m_subset0.z;
 
-    m_rmnDataset = (unsigned char*)malloc(m_rmnDim.x * m_rmnDim.y * m_rmnDim.z * sizeof(unsigned char));
+    m_rmnDataset = reinterpret_cast<unsigned char*>(malloc(m_rmnDim.x * m_rmnDim.y * m_rmnDim.z * sizeof(unsigned char)));
     if (m_rmnDataset == nullptr)
         throw runtime_error(makeErrnoErrorMessage("malloc", __FILE__, __LINE__));
 
-    fopen_s(&f, m_dataFileName.c_str(), "rb");
-    if (f == nullptr)
+    fopen_s(&datasetFile, m_dataFileName.c_str(), "rb");
+    if (datasetFile == nullptr)
         throw runtime_error(makeErrnoErrorMessage("fopen", __FILE__, __LINE__));
 
     total = 0;
@@ -104,7 +104,7 @@ void RmnDatasetFileLoader::loadRmnDataset()
         {
             offset = x * datasetDim.y * datasetDim.z + y * datasetDim.z + m_subset0.z;
 
-            auto error = fseek(f, offset, SEEK_SET);
+            auto error = fseek(datasetFile, offset, SEEK_SET);
             if (error != 0)
                 throw runtime_error(makeErrnoErrorMessage("fseek", __FILE__, __LINE__));
 
@@ -112,14 +112,15 @@ void RmnDatasetFileLoader::loadRmnDataset()
             actual = 0;
             while (actual < expected) 
             {
-                auto readBytes = fread(m_rmnDataset + total + actual, 1, expected - actual, f);
+                auto readBytes = fread(m_rmnDataset + total + actual, 1, expected - actual, datasetFile);
                 if (readBytes == 0)
                     throw runtime_error(makeErrnoErrorMessage("fread", __FILE__, __LINE__));
 
                 actual += static_cast<int>(readBytes);
             }
+
             total += actual;
         }
 
-    fclose(f);
+    fclose(datasetFile);
 }

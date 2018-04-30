@@ -30,7 +30,7 @@ public:
         m_fClickDrag = fClickDrag;
     }
 
-    static void animAdExit(void(*fGenerateFrame)(uchar4*, void*, int), void(*fCleanup)(void*), int width, int height, void* dataBlock = nullptr)
+    static void animAdExit(void(*fGenerateFrame)(uchar4*, void*, size_t), void(*fCleanup)(void*), int width, int height, void* dataBlock = nullptr)
     {
         static GpuGLAnim animBitmap(width, height, dataBlock);
         *getInstancePointer() = &animBitmap;
@@ -168,7 +168,7 @@ private:
     cudaGraphicsResource* m_resource;
     int m_width, m_height;
     void* m_dataBlock;
-    void(*m_fGenerateFrame)(uchar4*, void*, int);
+    void(*m_fGenerateFrame)(uchar4*, void*, size_t);
     void(*m_fAnimExit)(void*);
     void(*m_fClickDrag)(void*, int, int, int, int);
     int m_dragStartX, m_dragStartY;
