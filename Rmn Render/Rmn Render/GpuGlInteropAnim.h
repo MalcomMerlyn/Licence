@@ -65,7 +65,7 @@ private:
         prop.major = 1;
         error = cudaChooseDevice(&dev, &prop);
         if (error != cudaSuccess)
-            throw runtime_error(makeErrorMessage("cudaChooseDevice", error, __FILE__, __LINE__));
+            throw runtime_error(makeCudaErrorMessage("cudaChooseDevice", error, __FILE__, __LINE__));
 
         int argc = 1;
         char* argv = "GpuGLAnim";
@@ -80,7 +80,7 @@ private:
 
         error = cudaGraphicsGLRegisterBuffer(&m_resource, m_bufferObj, cudaGraphicsMapFlagsNone);
         if (error != cudaSuccess)
-            throw runtime_error(makeErrorMessage("cudaGraphicsGLRegisterBuffer", error, __FILE__, __LINE__));
+            throw runtime_error(makeCudaErrorMessage("cudaGraphicsGLRegisterBuffer", error, __FILE__, __LINE__));
     }
 
     inline static GpuGLAnim** getInstancePointer()
@@ -99,7 +99,7 @@ private:
     {
         cudaError error = cudaGraphicsUnregisterResource(m_resource);
         if (error != cudaSuccess)
-            cerr << makeErrorMessage("cudaGraphicsUnregisterResource", error, __FILE__, __LINE__) << endl;
+            cerr << makeCudaErrorMessage("cudaGraphicsUnregisterResource", error, __FILE__, __LINE__) << endl;
 
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER_ARB, 0);
         glDeleteBuffers(1, &m_bufferObj);
@@ -131,17 +131,17 @@ private:
 
         error = cudaGraphicsMapResources(1, &(getInstance()->m_resource), 0);
         if (error != cudaSuccess)
-            throw runtime_error(makeErrorMessage("cudaGraphicsMapResources", error, __FILE__, __LINE__));
+            throw runtime_error(makeCudaErrorMessage("cudaGraphicsMapResources", error, __FILE__, __LINE__));
 
         error = cudaGraphicsResourceGetMappedPointer((void**)&devPtr, &size, getInstance()->m_resource);
         if (error != cudaSuccess)
-            throw runtime_error(makeErrorMessage("cudaGraphicsResourceGetMappedPointer", error, __FILE__, __LINE__));
+            throw runtime_error(makeCudaErrorMessage("cudaGraphicsResourceGetMappedPointer", error, __FILE__, __LINE__));
 
         getInstance()->m_fGenerateFrame(devPtr, getInstance()->m_dataBlock, m_ticks++);
 
         error = cudaGraphicsUnmapResources(1, &getInstance()->m_resource, 0);
         if (error != cudaSuccess)
-            throw runtime_error(makeErrorMessage("cudaGraphicsUnmapResources", error, __FILE__, __LINE__));
+            throw runtime_error(makeCudaErrorMessage("cudaGraphicsUnmapResources", error, __FILE__, __LINE__));
 
         glutPostRedisplay();
     }

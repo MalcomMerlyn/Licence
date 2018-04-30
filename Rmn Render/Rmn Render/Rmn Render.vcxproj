@@ -189,6 +189,7 @@ copy "$(CudaToolkitBinDir)\cudart*.dll" "$(OutDir)"</Command>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CudaErrorMessage.h" />
+    <ClInclude Include="ErrnoErrorMessage.h" />
     <ClInclude Include="GLProcedures.h" />
     <ClInclude Include="GpuGlInteropAnim.h" />
     <ClInclude Include="RmnDatasetFileLoader.h" />

@@ -8,7 +8,7 @@
 using std::string;
 using std::to_string;
 
-string makeErrorMessage(cudaError error)
+static string makeCudaErrorMessage(cudaError error)
 {
     string errorName(cudaGetErrorName(error));
     string errorString(cudaGetErrorString(error));
@@ -16,7 +16,7 @@ string makeErrorMessage(cudaError error)
     return "Cuda failure : error code " + errorName + " : " + errorString;
 }
 
-string makeErrorMessage(cudaError error, const char* file, int line)
+static string makeCudaErrorMessage(cudaError error, const char* file, int line)
 {
     string errorPlace;
     string errorName(cudaGetErrorName(error));
@@ -30,7 +30,7 @@ string makeErrorMessage(cudaError error, const char* file, int line)
     return errorPlace + " : cuda failure : error code " + errorName + " : " + errorString;
 }
 
-string makeErrorMessage(string failedFunction, cudaError error)
+static string makeCudaErrorMessage(string failedFunction, cudaError error)
 {
     string errorName(cudaGetErrorName(error));
     string errorString(cudaGetErrorString(error));
@@ -38,7 +38,7 @@ string makeErrorMessage(string failedFunction, cudaError error)
     return "Function " + failedFunction + " failed with error code " + errorName + " : " + errorString;
 }
 
-string makeErrorMessage(string failedFunction, cudaError error, const char* file, int line)
+static string makeCudaErrorMessage(string failedFunction, cudaError error, const char* file, int line)
 {
     string errorPlace;
     string errorName(cudaGetErrorName(error));
