@@ -2,6 +2,9 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <CudaCompile Include="kernel.cu" />
+    <CudaCompile Include="FpsDisplay.cu">
+      <Filter>Source Files</Filter>
+    </CudaCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Header Files">
@@ -12,13 +15,22 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="CudaErrorMessage.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="GLProcedures.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="GpuGlInteropAnim.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="FpsDisplay.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CudaErrorMessage.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="FpsDisplay.cuh">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="VisualStudioCompilerErrors.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="RmnDatasetFileLoader.h">

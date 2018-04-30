@@ -5,9 +5,9 @@
 #include "cuda_gl_interop.h"
 #include "device_launch_parameters.h"
 
-#include "CudaErrorMessage.h"
 #include "GpuGlInteropAnim.h"
 #include "RmnDatasetFileLoader.h"
+#include "FpsDisplay.h"
 
 #include <stdio.h>
 
@@ -44,6 +44,8 @@ unsigned int imageHeigth = 512;
 unsigned int imageWidth = 512;
 
 const int dim = 512;
+
+FpsDisplay fpsDisplay({imageHeigth, imageWidth});
 
 __device__ float4 colors[10];
 __device__ uint2 colormap[10];
@@ -111,38 +113,6 @@ __global__ void simpleCudaGreenRipple(uchar4* ptr)
     ptr[offset].y = 0;
     ptr[offset].z = 0;
     ptr[offset].w = 255;
-}
-
-__global__ void simpleFrontRenderer(char* rmnData, size_t xDim, size_t yDim, size_t zDim, uchar4* ptr)
-{
-    int x = blockIdx.x;
-    int y = blockIdx.y;
-    int offset = x + y * gridDim.x;
-
-    int opacity = 0;
-
-    ptr[offset].x = 0;
-    ptr[offset].y = 0;
-    ptr[offset].z = 0;
-    ptr[offset].w = 255;
-
-    for (int i = 25; i < 26; i++)
-    { 
-        if (rmnData[i + x * xDim + y * xDim * yDim] != 0)
-            opacity += rmnData[i + x * xDim + y * xDim * yDim];
-
-        if (rmnData[i + x * xDim + y * xDim * yDim] == 0)
-            opacity = 0;
-    
-        if (opacity >= 1)
-        {
-            ptr[offset].x = 255;
-            ptr[offset].y = 0;
-            ptr[offset].z = 0;
-    
-            return;
-        }
-    } 
 }
 
 __device__ int pointNormal(dim3 dataSize, float3 point)
@@ -481,22 +451,45 @@ typedef struct _KernelLaunchParams
     unsigned int rotation;
 }KernelLaunchParams;
 
+cudaEvent_t start, stop;
+
 __host__ void renderFrame(uchar4* pixels, void* parameters, int ticks)
 {
     KernelLaunchParams* kernelParams = static_cast<KernelLaunchParams*>(parameters);
 
-    dim3 grids(imageHeigth / 8 + 1, imageWidth / 8 + 1);
-    dim3 threads(8, 8);
+    dim3 threads(8, 16);
+    dim3 grids(imageHeigth / threads.x + 1, imageWidth / threads.y + 1);
+
+    cudaEventRecord(start);
 
     renderFrame << <grids, threads >> > (kernelParams->dev_rmnData, kernelParams->rmnDim, kernelParams->imageDim, kernelParams->rotation, kernelParams->dev_normals, pixels);
 
-    kernelParams->rotation += 10;
+    cudaEventRecord(stop);
+    cudaEventSynchronize(stop);
+
+    float milliseconds = 0;
+    cudaEventElapsedTime(&milliseconds, start, stop);
+    
+    float fps = 1000 / milliseconds;
+    fpsDisplay.displayFps(pixels, fps);
+    
+    kernelParams->rotation += 1;
     kernelParams->rotation %= 360;
 }
 
 int main(int argc, char** argv)
 {
     RmnDatasetFileLoader rmnDatasetFileLoader("../Data", "vertebra");
+
+    cudaDeviceProp prop;
+    uchar4* devicePtr;
+    int dev;
+
+    string configFileName = "../Data/vertebra.cfg";
+    string dataFileName = "../Data/vertebra.dat";
+    string line;
+    ifstream configFile;
+    ifstream dataFile;
 
     unsigned char* dev_rmnData;
     float3* dev_normals;
@@ -508,6 +501,9 @@ int main(int argc, char** argv)
     imageDim.y = imageWidth;
 
     dim3 subset0, subset1;
+
+    cudaEventCreate(&start);
+    cudaEventCreate(&stop);
 
     try
     {
@@ -599,9 +595,7 @@ int main(int argc, char** argv)
     {
         cerr << "Fatal error!" << endl;
     }
-
-    
-    
+       
     cudaError = cudaMalloc(&ts, 6 * imageHeigth * imageWidth * sizeof(float));
     if (cudaError != cudaError::cudaSuccess)
     {
