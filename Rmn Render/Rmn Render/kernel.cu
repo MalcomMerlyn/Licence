@@ -12,7 +12,9 @@
 #include <stdio.h>
 
 #include <exception>
+#include <functional>
 #include <iostream>
+#include <memory>
 #include <vector>
 
 #define R 0
@@ -25,8 +27,10 @@ using std::cerr;
 using std::endl;
 using std::getline;
 using std::exception;
+using std::function;
 using std::string;
 using std::runtime_error;
+using std::unique_ptr;
 using std::vector;
 
 dim3 rmnDim;
@@ -89,22 +93,6 @@ __device__ const float epsilon = 0.001f;
 __device__ const float step = 0.1f;
 __device__ const float ambient = 0.3f;
 __device__ const float diffuse = 0.7f;
-
-__global__ void simpleCudaGreenRipple(uchar4* ptr)
-{
-    int x = threadIdx.x + blockIdx.x * blockDim.x;
-    int y = threadIdx.y + blockIdx.y * blockDim.y;
-    int offset = x + y * blockDim.x * gridDim.x;
-
-    float fx = x / (float)dim - 0.5f;
-    float fy = y / (float)dim - 0.5f;
-    unsigned char red = 128 + 127 * sin(abs(100 * fx) - abs(100 * fy));
-
-    ptr[offset].x = red;
-    ptr[offset].y = 0;
-    ptr[offset].z = 0;
-    ptr[offset].w = 255;
-}
 
 __device__ int pointNormal(dim3 dataSize, float3 point)
 {
@@ -443,6 +431,7 @@ typedef struct _KernelLaunchParams
 }KernelLaunchParams;
 
 cudaEvent_t start, stop;
+float minFps = 1000, meanFps = 0;
 
 __host__ void renderFrame(uchar4* pixels, void* parameters, size_t ticks)
 {
@@ -460,13 +449,25 @@ __host__ void renderFrame(uchar4* pixels, void* parameters, size_t ticks)
 
     float milliseconds = 0;
     cudaEventElapsedTime(&milliseconds, start, stop);
-    
+
     float fps = 1000 / milliseconds;
     fpsDisplay.displayFps(pixels, fps);
-    
+
+    meanFps += fps;
+    if (fps < minFps) 
+        minFps = fps;
+
     kernelParams->rotation += 1;
-    kernelParams->rotation %= 360;
+    if (kernelParams->rotation == 359)
+    {
+        cout << "Minimum fps " << minFps << endl;
+        cout << "Mean fps " << meanFps / 360 << endl;
+        exit(0);
+    }
 }
+
+unique_ptr<unsigned char, function<void(unsigned char*)>> dev_normals_uptr;
+unique_ptr<unsigned char, function<void(unsigned char*)>> dev_rmnData_uptr;
 
 int main(int argc, char** argv)
 {
@@ -510,9 +511,23 @@ int main(int argc, char** argv)
 
         rmnDim = rmnDatasetFileLoader.getRmnDatasetDimensions();
 
+        //int nr0 = 0, nr1 = 0;
+        //for (int i = 0; i < rmnDim.x * rmnDim.y * rmnDim.z; i++)
+        //{
+        //    if (rmnDatasetFileLoader.getRmnDataset()[i] == 0) nr0++;
+        //    else nr1++;
+        //}
+        //
+        //cout << "0 : " << nr0 << " 1 : " << nr1 << " raport : " << (float)nr0 / nr1 << endl;
+
         cudaError = cudaMalloc((void**)&dev_rmnData, rmnDim.x * rmnDim.y * rmnDim.z * sizeof(char));
         if (cudaError != cudaSuccess)
             throw runtime_error(makeCudaErrorMessage("cudaMalloc", cudaError, __FILE__, __LINE__));
+
+        dev_rmnData_uptr = unique_ptr<unsigned char, function<void(unsigned char*)>>(
+            dev_rmnData, 
+            [](unsigned char* dev_ptr) { cout << "CudaFree" << endl; cudaFree(dev_ptr); }
+        );
 
         cudaError = cudaMemcpy(dev_rmnData, rmnDatasetFileLoader.getRmnDataset(), rmnDim.x * rmnDim.y * rmnDim.z * sizeof(char), cudaMemcpyHostToDevice);
         if (cudaError != cudaError::cudaSuccess)
@@ -521,6 +536,11 @@ int main(int argc, char** argv)
         cudaError = cudaMalloc((void**)&dev_normals, rmnDim.x * rmnDim.y * rmnDim.z * sizeof(float3));
         if (cudaError != cudaSuccess)
             throw runtime_error(makeCudaErrorMessage("cudaMalloc", cudaError, __FILE__, __LINE__));
+
+        dev_normals_uptr = unique_ptr<unsigned char, function<void(unsigned char*)>> (
+            dev_rmnData,
+            [](unsigned char* dev_ptr) { cout << "CudaFree" << endl; cudaFree(dev_ptr); }
+        );
 
         dim3 grids(rmnDim.x / 16 + 1, rmnDim.y / 16 + 1);
         dim3 threads(16, 16);

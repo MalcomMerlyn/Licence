@@ -95,7 +95,7 @@ private:
         return *getInstancePointer();
     }
 
-    ~GpuGLAnim()
+    void Destroy()
     {
         cudaError error = cudaGraphicsUnregisterResource(m_resource);
         if (error != cudaSuccess)
@@ -104,6 +104,8 @@ private:
         glBindBuffer(GL_PIXEL_UNPACK_BUFFER_ARB, 0);
         glDeleteBuffers(1, &m_bufferObj);
     }
+
+    ~GpuGLAnim() { }
 
     static void s_mouse(int button, int state, int xPos, int yPos)
     {
@@ -151,7 +153,7 @@ private:
         switch (key)
         {
         case 27:
-            //getInstance()->~GpuGLAnim();
+            getInstance()->Destroy();
             exit(0);
         }
     }
