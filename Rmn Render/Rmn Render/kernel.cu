@@ -59,7 +59,7 @@ __device__ unsigned int getColormapColor(size_t key)
 //__global__ void setColormapValue(size_t key, unsigned int value)
 //{
 //    colormap[key].x = value;
-//    colormapLength++;
+//    colormapLength[1]++;
 //}
 
 //__global__ void setColormapColor(size_t key, unsigned int color)
@@ -307,8 +307,6 @@ __global__ void renderFrame(unsigned char* rmnData, dim3 dataSize, uint2 imageDi
 
         float t = -numerator / denominator;
 
-        //ts[6 * x + 6 * y * imageWidth + k] = t;
-
         /* The intersection is behind the camera */
         if (t < 0)
         {
@@ -505,17 +503,13 @@ int main(int argc, char** argv)
         if (cudaError != cudaSuccess)
             throw runtime_error(makeCudaErrorMessage("cudaMemcpyToSymbol", cudaError, __FILE__, __LINE__));
 
-        for (size_t c = 0; c < rmnDatasetFileLoader.getColormap().size(); c++)
-        {
-            if (c % 2 == 0)
-            {
-                //setColormapValue << <1, 1 >> > (c / 2, rmnDatasetFileLoader.getColormap()[c]);
-            }
-            else
-            {
-                //setColormapColor << <1, 1 >> > (c / 2, rmnDatasetFileLoader.getColormap()[c]);
-            }
-        }
+        //for (size_t c = 0; c < rmnDatasetFileLoader.getColormap().size(); c++)
+        //{
+        //    if (c % 2 == 0)
+        //        setColormapValue << <1, 1 >> > (c / 2, rmnDatasetFileLoader.getColormap()[c]);
+        //    else
+        //        setColormapColor << <1, 1 >> > (c / 2, rmnDatasetFileLoader.getColormap()[c]);
+        //}
 
         cudaError = cudaMemcpyToSymbol(colormap, rmnDatasetFileLoader.getColormap().data(), rmnDatasetFileLoader.getColormap().size() * sizeof(unsigned int));
         if (cudaError != cudaSuccess)
