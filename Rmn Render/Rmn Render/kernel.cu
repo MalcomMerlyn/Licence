@@ -42,9 +42,9 @@ const int dim = 512;
 
 FpsDisplay fpsDisplay({imageHeigth, imageWidth});
 
-__device__ float4 colors[10];
-__device__ uint2 colormap[10];
-__device__ size_t colormapLength = 0;
+__constant__ float4 colors[10];
+__constant__ uint2 colormap[10];
+__constant__ size_t colormapLength[1];
 
 __device__ unsigned int getColormapValue(size_t key)
 {
@@ -56,30 +56,30 @@ __device__ unsigned int getColormapColor(size_t key)
     return colormap[key].y;
 }
 
-__global__ void setColormapValue(size_t key, unsigned int value)
-{
-    colormap[key].x = value;
-    colormapLength++;
-}
+//__global__ void setColormapValue(size_t key, unsigned int value)
+//{
+//    colormap[key].x = value;
+//    colormapLength++;
+//}
 
-__global__ void setColormapColor(size_t key, unsigned int color)
-{
-    colormap[key].y = color;
-}
+//__global__ void setColormapColor(size_t key, unsigned int color)
+//{
+//    colormap[key].y = color;
+//}
 
 __device__ float getColorValue(size_t key, size_t color)
 {
     return ((float*)(colors + key))[color];
 }
 
-__global__ void setColorValue(size_t key, size_t color, float value)
-{
-    ((float*)(colors + key))[color] = value;
-}
+//__global__ void setColorValue(size_t key, size_t color, float value)
+//{
+//    ((float*)(colors + key))[color] = value;
+//}
 
 __device__ int getPositionForColormapEntryValue(float value)
 {
-    for (size_t i = 0; i < colormapLength; i++)
+    for (size_t i = 0; i < colormapLength[1]; i++)
     {
         if (getColormapValue(i) > value)
             return i - 1;
@@ -493,21 +493,38 @@ int main(int argc, char** argv)
 
         rmnDatasetFileLoader.loadDataset();
 
-        for (size_t c = 0; c < rmnDatasetFileLoader.getColor().size(); c++)
-        {
-            setColorValue << <1, 1 >> > (c, R, rmnDatasetFileLoader.getColor()[c].r);
-            setColorValue << <1, 1 >> > (c, G, rmnDatasetFileLoader.getColor()[c].g);
-            setColorValue << <1, 1 >> > (c, B, rmnDatasetFileLoader.getColor()[c].b);
-            setColorValue << <1, 1 >> > (c, A, rmnDatasetFileLoader.getColor()[c].a);
-        }
+        //for (size_t c = 0; c < rmnDatasetFileLoader.getColor().size(); c++)
+        //{
+        //    setColorValue << <1, 1 >> > (c, R, rmnDatasetFileLoader.getColor()[c].r);
+        //    setColorValue << <1, 1 >> > (c, G, rmnDatasetFileLoader.getColor()[c].g);
+        //    setColorValue << <1, 1 >> > (c, B, rmnDatasetFileLoader.getColor()[c].b);
+        //    setColorValue << <1, 1 >> > (c, A, rmnDatasetFileLoader.getColor()[c].a);
+        //}
+
+        cudaError = cudaMemcpyToSymbol(colors, rmnDatasetFileLoader.getColor().data(), rmnDatasetFileLoader.getColor().size() * sizeof(Color));
+        if (cudaError != cudaSuccess)
+            throw runtime_error(makeCudaErrorMessage("cudaMemcpyToSymbol", cudaError, __FILE__, __LINE__));
 
         for (size_t c = 0; c < rmnDatasetFileLoader.getColormap().size(); c++)
         {
             if (c % 2 == 0)
-                setColormapValue << <1, 1 >> > (c / 2, rmnDatasetFileLoader.getColormap()[c]);
+            {
+                //setColormapValue << <1, 1 >> > (c / 2, rmnDatasetFileLoader.getColormap()[c]);
+            }
             else
-                setColormapColor << <1, 1 >> > (c / 2, rmnDatasetFileLoader.getColormap()[c]);
+            {
+                //setColormapColor << <1, 1 >> > (c / 2, rmnDatasetFileLoader.getColormap()[c]);
+            }
         }
+
+        cudaError = cudaMemcpyToSymbol(colormap, rmnDatasetFileLoader.getColormap().data(), rmnDatasetFileLoader.getColormap().size() * sizeof(unsigned int));
+        if (cudaError != cudaSuccess)
+            throw runtime_error(makeCudaErrorMessage("cudaMemcpyToSymbol", cudaError, __FILE__, __LINE__));
+
+        size_t colormapSize = rmnDatasetFileLoader.getColormap().size();
+        cudaError = cudaMemcpyToSymbol(colormapLength, &colormapSize, sizeof(size_t));
+        if (cudaError != cudaSuccess)
+            throw runtime_error(makeCudaErrorMessage("cudaMemcpyToSymbol", cudaError, __FILE__, __LINE__));
 
         rmnDim = rmnDatasetFileLoader.getRmnDatasetDimensions();
 
