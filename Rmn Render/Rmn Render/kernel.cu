@@ -352,9 +352,9 @@ __global__ void renderFrame(unsigned char* rmnData, dim3 dataSize, uint2 imageDi
         return;
     }
 
-    float3 prevNormal = { 0, 0, 0 }, point, normal, light;
+    float3 prevNormal = { 0, 0, 0 }, point, normal, light, lastNormal;
     float nlcos, color[3] = { 0, 0, 0 }, c[4], value;
-    int position;
+    int position, lastPosition = 0;
 
     for (float t = tmax; t >= tmin; t -= step)
     {
@@ -373,9 +373,19 @@ __global__ void renderFrame(unsigned char* rmnData, dim3 dataSize, uint2 imageDi
 
         position = pointNormal(dataSize, point);
 
-        normal.x = normals[position].x;
-        normal.y = normals[position].y;
-        normal.z = normals[position].z;
+        /* COMMENT HERE TO REMOVE REGISTERY CACHING*/
+        if (position != lastPosition)
+        {
+            normal.x = normals[position].x;
+            normal.y = normals[position].y;
+            normal.z = normals[position].z;
+
+            lastPosition = position;
+        }
+        else
+        {
+            normal = lastNormal;
+        }
 
         if (fabsf(normal.x) <= epsilon && fabsf(normal.y) <= epsilon && fabsf(normal.z) <= epsilon)
         {
