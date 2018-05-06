@@ -466,7 +466,7 @@ __host__ void renderFrame(uchar4* pixels, void* parameters, size_t ticks)
     fpsDisplay.displayFps(pixels, fps);
 
     meanFps += fps;
-    if (fps < minFps) 
+    if (fps < minFps && kernelParams->rotation > 5) 
         minFps = fps;
 
     kernelParams->rotation += 1;
