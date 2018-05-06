@@ -192,28 +192,18 @@ __device__ float meanPointValue(unsigned char* rmnData, dim3 dataSize, float3 po
     float yf = point.y - j;
     float zf = point.z - k;
 
-    unsigned int int000, int001, int010, int011, int100, int101, int110, int111;
     unsigned char c000, c001, c010, c011, c100, c101, c110, c111;
 
     if (i >= 0 && i + 1 < dataSize.x && j >= 0 && j + 1 < dataSize.y && k >= 0 && k + 1 < dataSize.z)
     {
-        int000 = tex2D(textureRmnData, (i + 0) * dataSize.y * dataSize.z * (j + 0) * dataSize.z, (k + 0));
-        int001 = tex2D(textureRmnData, (i + 0) * dataSize.y * dataSize.z * (j + 0) * dataSize.z, (k + 1));
-        int010 = tex2D(textureRmnData, (i + 0) * dataSize.y * dataSize.z * (j + 1) * dataSize.z, (k + 0));
-        int011 = tex2D(textureRmnData, (i + 0) * dataSize.y * dataSize.z * (j + 1) * dataSize.z, (k + 1));
-        int100 = tex2D(textureRmnData, (i + 1) * dataSize.y * dataSize.z * (j + 0) * dataSize.z, (k + 0));
-        int101 = tex2D(textureRmnData, (i + 1) * dataSize.y * dataSize.z * (j + 0) * dataSize.z, (k + 1));
-        int110 = tex2D(textureRmnData, (i + 1) * dataSize.y * dataSize.z * (j + 1) * dataSize.z, (k + 0));
-        int111 = tex2D(textureRmnData, (i + 1) * dataSize.y * dataSize.z * (j + 1) * dataSize.z, (k + 1));
-
-        c000 = ((unsigned char*)(&int000))[0];
-        c001 = ((unsigned char*)(&int001))[0];
-        c010 = ((unsigned char*)(&int010))[0];
-        c011 = ((unsigned char*)(&int011))[0];
-        c100 = ((unsigned char*)(&int100))[0];
-        c101 = ((unsigned char*)(&int101))[0];
-        c110 = ((unsigned char*)(&int110))[0];
-        c111 = ((unsigned char*)(&int111))[0];
+        c000 = tex2D(textureRmnData, (i + 0) + dataSize.x * (j + 0), (k + 0));
+        c001 = tex2D(textureRmnData, (i + 0) + dataSize.x * (j + 0), (k + 1));
+        c010 = tex2D(textureRmnData, (i + 0) + dataSize.x * (j + 1), (k + 0));
+        c011 = tex2D(textureRmnData, (i + 0) + dataSize.x * (j + 1), (k + 1));
+        c100 = tex2D(textureRmnData, (i + 1) + dataSize.x * (j + 0), (k + 0));
+        c101 = tex2D(textureRmnData, (i + 1) + dataSize.x * (j + 0), (k + 1));
+        c110 = tex2D(textureRmnData, (i + 1) + dataSize.x * (j + 1), (k + 0));
+        c111 = tex2D(textureRmnData, (i + 1) + dataSize.x * (j + 1), (k + 1));
     }
 
     float c00 = c000 * (1.0f - xf) + c100 * xf;
@@ -604,28 +594,49 @@ int main(int argc, char** argv)
             dev_rmnData,
             [](unsigned char* dev_ptr) { cout << "CudaFree" << endl; cudaFree(dev_ptr); }
         );
-        
-        cudaChannelFormatDesc descriptor = cudaCreateChannelDesc<char>();
-
-        cudaError = cudaBindTexture2D(nullptr, textureRmnData, dev_rmnData, descriptor, xDim, yDim, xDim);
-        if (cudaError != cudaError::cudaSuccess)
-            throw runtime_error(makeCudaErrorMessage("cudaBindTexture2D", cudaError, __FILE__, __LINE__));
 
         cudaError = cudaMemset(dev_rmnData, 0, xDim * yDim * sizeof(unsigned char));
         if (cudaError != cudaSuccess)
             throw runtime_error(makeCudaErrorMessage("cudaMemset", cudaError, __FILE__, __LINE__));
 
+        unsigned char* reorderedRmnData = reinterpret_cast<unsigned char*>(malloc(rmnDim.x * rmnDim.y * rmnDim.z * sizeof(unsigned char)));
+        if (reorderedRmnData == nullptr)
+            throw runtime_error(makeErrnoErrorMessage("malloc", __FILE__, __LINE__));
+
+        for (size_t i = 0; i < rmnDim.x; i++)
+            for (size_t j = 0; j < rmnDim.y; j++)
+                for (size_t k = 0; k < rmnDim.z; k++)
+                {
+                    reorderedRmnData[k * rmnDim.x * rmnDim.y + j * rmnDim.x + i] = 
+                        rmnDatasetFileLoader.getRmnDataset()[i * rmnDim.y * rmnDim.z + j * rmnDim.z + k];
+                }
+        
         for (size_t k = 0; k < rmnDim.z; k++)
-        {
+        {            
             cudaError = cudaMemcpy(
                 dev_rmnData + k * xDim,
-                rmnDatasetFileLoader.getRmnDataset() + k * rmnDim.x * rmnDim.y,
+                reorderedRmnData + k * rmnDim.x * rmnDim.y,
                 rmnDim.x * rmnDim.y * sizeof(unsigned char),
                 cudaMemcpyHostToDevice
             );
             if (cudaError != cudaError::cudaSuccess)
                 throw runtime_error(makeCudaErrorMessage("cudaMemcpy", cudaError, __FILE__, __LINE__));
         }
+
+        //cudaError = cudaMemcpy(
+        //    dev_rmnData,
+        //    rmnDatasetFileLoader.getRmnDataset(),
+        //    rmnDim.x * rmnDim.y * rmnDim.z * sizeof(unsigned char),
+        //    cudaMemcpyHostToDevice
+        //);
+        //if (cudaError != cudaError::cudaSuccess)
+        //    throw runtime_error(makeCudaErrorMessage("cudaMemcpy", cudaError, __FILE__, __LINE__));
+
+        cudaChannelFormatDesc descriptor = cudaCreateChannelDesc<char>();
+
+        cudaError = cudaBindTexture2D(nullptr, textureRmnData, dev_rmnData, descriptor, xDim, yDim, xDim);
+        if (cudaError != cudaError::cudaSuccess)
+            throw runtime_error(makeCudaErrorMessage("cudaBindTexture2D", cudaError, __FILE__, __LINE__));
 
         dim3 grids(rmnDim.x / 16 + 1, rmnDim.y / 16 + 1);
         dim3 threads(16, 16);
