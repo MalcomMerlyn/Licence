@@ -11,6 +11,7 @@
 
 #include <stdio.h>
 
+#include <algorithm>
 #include <exception>
 #include <functional>
 #include <iostream>
@@ -28,6 +29,7 @@ using std::endl;
 using std::getline;
 using std::exception;
 using std::function;
+using std::max;
 using std::string;
 using std::runtime_error;
 using std::unique_ptr;
@@ -39,6 +41,9 @@ unsigned int imageHeigth = 512;
 unsigned int imageWidth = 512;
 
 const int dim = 512;
+
+texture<char, 3, cudaReadModeElementType> textureRmnData;
+cudaArray* dev_rmnDataArray = 0;
 
 FpsDisplay fpsDisplay({imageHeigth, imageWidth});
 
@@ -193,14 +198,14 @@ __device__ float meanPointValue(unsigned char* rmnData, dim3 dataSize, float3 po
 
     if (i >= 0 && i + 1 < dataSize.x && j >= 0 && j + 1 < dataSize.y && k >= 0 && k + 1 < dataSize.z)
     {
-        c000 = rmnData[(i + 0) * dataSize.y * dataSize.z + (j + 0) * dataSize.z + (k + 0)];
-        c001 = rmnData[(i + 0) * dataSize.y * dataSize.z + (j + 0) * dataSize.z + (k + 1)];
-        c010 = rmnData[(i + 0) * dataSize.y * dataSize.z + (j + 1) * dataSize.z + (k + 0)];
-        c011 = rmnData[(i + 0) * dataSize.y * dataSize.z + (j + 1) * dataSize.z + (k + 1)];
-        c100 = rmnData[(i + 1) * dataSize.y * dataSize.z + (j + 0) * dataSize.z + (k + 0)];
-        c101 = rmnData[(i + 1) * dataSize.y * dataSize.z + (j + 0) * dataSize.z + (k + 1)];
-        c110 = rmnData[(i + 1) * dataSize.y * dataSize.z + (j + 1) * dataSize.z + (k + 0)];
-        c111 = rmnData[(i + 1) * dataSize.y * dataSize.z + (j + 1) * dataSize.z + (k + 1)];
+        c000 = tex3D(textureRmnData, (i + 0), (j + 0), (k + 0));
+        c001 = tex3D(textureRmnData, (i + 0), (j + 0), (k + 1));
+        c010 = tex3D(textureRmnData, (i + 0), (j + 1), (k + 0));
+        c011 = tex3D(textureRmnData, (i + 0), (j + 1), (k + 1));
+        c100 = tex3D(textureRmnData, (i + 1), (j + 0), (k + 0));
+        c101 = tex3D(textureRmnData, (i + 1), (j + 0), (k + 1));
+        c110 = tex3D(textureRmnData, (i + 1), (j + 1), (k + 0));
+        c111 = tex3D(textureRmnData, (i + 1), (j + 1), (k + 1));
     }
 
     float c00 = c000 * (1.0f - xf) + c100 * xf;
@@ -450,7 +455,8 @@ __host__ void renderFrame(uchar4* pixels, void* parameters, size_t ticks)
 
     cudaEventRecord(start);
 
-    renderFrame << <grids, threads >> > (kernelParams->dev_rmnData, kernelParams->rmnDim, kernelParams->imageDim, kernelParams->rotation, kernelParams->dev_normals, pixels);
+    renderFrame << <grids, threads >> > 
+        (kernelParams->dev_rmnData, kernelParams->rmnDim, kernelParams->imageDim, kernelParams->rotation, kernelParams->dev_normals, pixels);
 
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
@@ -462,7 +468,7 @@ __host__ void renderFrame(uchar4* pixels, void* parameters, size_t ticks)
     fpsDisplay.displayFps(pixels, fps);
 
     meanFps += fps;
-    if (fps < minFps) 
+    if (fps < minFps && kernelParams->rotation > 5) 
         minFps = fps;
 
     kernelParams->rotation += 1;
@@ -470,18 +476,22 @@ __host__ void renderFrame(uchar4* pixels, void* parameters, size_t ticks)
     {
         cout << "Minimum fps " << minFps << endl;
         cout << "Mean fps " << meanFps / 360 << endl;
+        cudaDeviceReset();
         exit(0);
     }
 }
 
 unique_ptr<unsigned char, function<void(unsigned char*)>> dev_normals_uptr;
 unique_ptr<unsigned char, function<void(unsigned char*)>> dev_rmnData_uptr;
+unique_ptr<unsigned char, function<void(unsigned char*)>> dev_rmnDataUnaligned_uptr;
+
 
 int main(int argc, char** argv)
 {
     RmnDatasetFileLoader rmnDatasetFileLoader("../Data", "vertebra");
 
     unsigned char* dev_rmnData;
+    unsigned char* dev_rmnDataUnaligned;
     float3* dev_normals;
     cudaError cudaError;
 
@@ -541,16 +551,16 @@ int main(int argc, char** argv)
         //
         //cout << "0 : " << nr0 << " 1 : " << nr1 << " raport : " << (float)nr0 / nr1 << endl;
 
-        cudaError = cudaMalloc((void**)&dev_rmnData, rmnDim.x * rmnDim.y * rmnDim.z * sizeof(char));
+        cudaError = cudaMalloc((void**)&dev_rmnDataUnaligned, rmnDim.x * rmnDim.y * rmnDim.z * sizeof(char));
         if (cudaError != cudaSuccess)
             throw runtime_error(makeCudaErrorMessage("cudaMalloc", cudaError, __FILE__, __LINE__));
 
-        dev_rmnData_uptr = unique_ptr<unsigned char, function<void(unsigned char*)>>(
-            dev_rmnData, 
+        dev_rmnDataUnaligned_uptr = unique_ptr<unsigned char, function<void(unsigned char*)>>(
+            dev_rmnDataUnaligned, 
             [](unsigned char* dev_ptr) { cout << "CudaFree" << endl; cudaFree(dev_ptr); }
         );
 
-        cudaError = cudaMemcpy(dev_rmnData, rmnDatasetFileLoader.getRmnDataset(), rmnDim.x * rmnDim.y * rmnDim.z * sizeof(char), cudaMemcpyHostToDevice);
+        cudaError = cudaMemcpy(dev_rmnDataUnaligned, rmnDatasetFileLoader.getRmnDataset(), rmnDim.x * rmnDim.y * rmnDim.z * sizeof(char), cudaMemcpyHostToDevice);
         if (cudaError != cudaError::cudaSuccess)
             throw runtime_error(makeCudaErrorMessage("cudaMemcpy", cudaError, __FILE__, __LINE__));
 
@@ -559,14 +569,67 @@ int main(int argc, char** argv)
             throw runtime_error(makeCudaErrorMessage("cudaMalloc", cudaError, __FILE__, __LINE__));
 
         dev_normals_uptr = unique_ptr<unsigned char, function<void(unsigned char*)>> (
-            dev_rmnData,
+            (unsigned char*)dev_normals,
             [](unsigned char* dev_ptr) { cout << "CudaFree" << endl; cudaFree(dev_ptr); }
         );
+
+        unsigned char* reorderedRmnData = reinterpret_cast<unsigned char*>(malloc(rmnDim.x * rmnDim.y * rmnDim.z * sizeof(unsigned char)));
+        if (reorderedRmnData == nullptr)
+            throw runtime_error(makeErrnoErrorMessage("malloc", __FILE__, __LINE__));
+
+        for (size_t i = 0; i < rmnDim.x; i++)
+            for (size_t j = 0; j < rmnDim.y; j++)
+                for (size_t k = 0; k < rmnDim.z; k++)
+                {
+                    reorderedRmnData[k * rmnDim.x * rmnDim.y + j * rmnDim.x + i] =
+                        rmnDatasetFileLoader.getRmnDataset()[i * rmnDim.y * rmnDim.z + j * rmnDim.z + k];
+                }
+
+        //cudaError = cudaMalloc((void**)&dev_rmnData, rmnDim.x * rmnDim.y * rmnDim.z * sizeof(char));
+        //if (cudaError != cudaSuccess)
+        //    throw runtime_error(makeCudaErrorMessage("cudaMalloc", cudaError, __FILE__, __LINE__));
+        //
+        //dev_rmnData_uptr = unique_ptr<unsigned char, function<void(unsigned char*)>>(
+        //    dev_rmnData,
+        //    [](unsigned char* dev_ptr) { cout << "CudaFree" << endl; cudaFree(dev_ptr); }
+        //);
+        //
+        //cudaError = cudaMemcpy(dev_rmnData, reorderedRmnData, textureDim * textureDim * textureDim * sizeof(unsigned char), cudaMemcpyHostToDevice);
+        //if (cudaError != cudaError::cudaSuccess)
+        //    throw runtime_error(makeCudaErrorMessage("cudaMemcpy", cudaError, __FILE__, __LINE__));
+
+        cudaChannelFormatDesc descriptor = cudaCreateChannelDesc<char>();
+        cudaExtent rmnDataVolumeSize = { rmnDim.x, rmnDim.y, rmnDim.z };
+        cudaError = cudaMalloc3DArray(&dev_rmnDataArray, &descriptor, rmnDataVolumeSize);
+        if (cudaError != cudaSuccess)
+            throw runtime_error(makeCudaErrorMessage("cudaMalloc3DArray", cudaError, __FILE__, __LINE__));
+
+        cudaMemcpy3DParms memcpyParams;
+        memset(&memcpyParams, 0, sizeof(memcpyParams));
+        memcpyParams.srcPtr = make_cudaPitchedPtr((void*)reorderedRmnData, rmnDataVolumeSize.width * sizeof(char), rmnDataVolumeSize.width, rmnDataVolumeSize.height);
+        memcpyParams.dstArray = dev_rmnDataArray;
+        memcpyParams.extent = rmnDataVolumeSize;
+        memcpyParams.kind = cudaMemcpyHostToDevice;
+
+        cudaError = cudaMemcpy3D(&memcpyParams);
+        if (cudaError != cudaSuccess)
+            throw runtime_error(makeCudaErrorMessage("cudaMemcpy3D", cudaError, __FILE__, __LINE__));
+
+        textureRmnData.normalized = false;                      // access with normalized texture coordinates
+        textureRmnData.filterMode = cudaFilterModePoint;      // linear interpolation 
+        textureRmnData.addressMode[0] = cudaAddressModeWrap;   // wrap texture coordinates
+        textureRmnData.addressMode[1] = cudaAddressModeWrap;
+        textureRmnData.addressMode[2] = cudaAddressModeWrap;
+
+        // bind array to 3D texture
+        cudaError = cudaBindTextureToArray(textureRmnData, dev_rmnDataArray, descriptor);
+        if (cudaError != cudaSuccess)
+            throw runtime_error(makeCudaErrorMessage("cudaMemcpy3D", cudaError, __FILE__, __LINE__));
 
         dim3 grids(rmnDim.x / 16 + 1, rmnDim.y / 16 + 1);
         dim3 threads(16, 16);
 
-        calculateNormals << <grids, threads >> > (dev_rmnData, rmnDim, dev_normals);
+        calculateNormals << <grids, threads >> > (dev_rmnDataUnaligned, rmnDim, dev_normals);
         cudaDeviceSynchronize();
 
         KernelLaunchParams params;
