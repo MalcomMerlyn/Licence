@@ -75,7 +75,7 @@ void FpsDisplay::displayFps(uchar4* pixels, float fps)
     
     while (fps100 != 0)
     {
-        digit = fps100 % 100;
+        digit = fps100 % 10;
         drawDigit(digit, m_imageDim, pixels - position * DigitWidth - PointWidth);
         fps100 /= 10;
         position++;
