@@ -69,20 +69,20 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
     <IncludePath>c:\Users\Mihai\Desktop\Computer Science\Licence\freeglut\include\;$(IncludePath)</IncludePath>
-    <LibraryPath>c:\Users\Mihai\Desktop\Computer Science\Licence\freeglut\lib\x64\</LibraryPath>
+    <LibraryPath>C:\Users\Batman\Desktop\Computer Science\Licence\Rmn Render\freeglut\lib</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);c:\Users\Mihai\Desktop\Computer Science\Licence\freeglut\include\;</IncludePath>
-    <LibraryPath>c:\Users\Mihai\Desktop\Computer Science\Licence\freeglut\lib\x64\;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64</LibraryPath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);C:\Users\Batman\Desktop\Computer Science\Licence\Rmn Render\freeglut\include</IncludePath>
+    <LibraryPath>C:\Users\Batman\Desktop\Computer Science\Licence\Rmn Render\freeglut\lib\x64;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <IncludePath>c:\Users\Mihai\Desktop\Computer Science\Licence\freeglut\include\;$(IncludePath)</IncludePath>
     <LibraryPath>c:\Users\Mihai\Desktop\Computer Science\Licence\freeglut\lib\x64\</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);c:\Users\Mihai\Desktop\Computer Science\Licence\freeglut\include\;</IncludePath>
-    <LibraryPath>c:\Users\Mihai\Desktop\Computer Science\Licence\freeglut\lib\x64\;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64</LibraryPath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)\freeglut\include\</IncludePath>
+    <LibraryPath>$(SolutionDir)\freeglut\lib\x64;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64);$(NETFXKitsDir)Lib\um\x64;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -111,7 +111,7 @@ copy "$(CudaToolkitBinDir)\cudart*.dll" "$(OutDir)"</Command>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;WIN64;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>c:\Users\Mihai\Desktop\Computer Science\Licence\freeglut\include\;%(AdditionalIncludeDirectories);$(CudaToolkitIncludeDir)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\Batman\Desktop\Computer Science\Licence\Rmn Render\freeglut\lib\x64;%(AdditionalIncludeDirectories);$(CudaToolkitIncludeDir)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -166,7 +166,7 @@ copy "$(CudaToolkitBinDir)\cudart*.dll" "$(OutDir)"</Command>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;WIN64;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>c:\Users\Mihai\Desktop\Computer Science\Licence\freeglut\include\;%(AdditionalIncludeDirectories);$(CudaToolkitIncludeDir)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)\freeglut\include;%(AdditionalIncludeDirectories);$(CudaToolkitIncludeDir)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -175,7 +175,7 @@ copy "$(CudaToolkitBinDir)\cudart*.dll" "$(OutDir)"</Command>
       <SubSystem>Console</SubSystem>
       <AdditionalDependencies>cudart.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;freeglut.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <SuppressStartupBanner>false</SuppressStartupBanner>
-      <AdditionalLibraryDirectories>C:\Users\Mihai\Desktop\Computer Science\Licence\freeglut\lib\x64\;%(AdditionalLibraryDirectories);$(CudaToolkitLibDir);</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(SolutionDir)\freeglut\lib\x64\;%(AdditionalLibraryDirectories);$(CudaToolkitLibDir)</AdditionalLibraryDirectories>
       <SwapRunFromNET>true</SwapRunFromNET>
     </Link>
     <PostBuildEvent>
@@ -184,7 +184,7 @@ copy "$(CudaToolkitBinDir)\cudart*.dll" "$(OutDir)"</Command>
     </PostBuildEvent>
     <CudaCompile>
       <TargetMachinePlatform>64</TargetMachinePlatform>
-      <Include>c:\Users\Mihai\Desktop\Computer Science\Licence\freeglut\include\;%(Include)</Include>
+      <Include>$(SolutionDir)\freeglut\include\;%(Include)</Include>
       <AdditionalOptions>-Xptxas -v -Wno-deprecated-gpu-targets %(AdditionalOptions)</AdditionalOptions>
       <CodeGeneration>compute_20,sm_20</CodeGeneration>
       <PtxAsOptionV>true</PtxAsOptionV>
