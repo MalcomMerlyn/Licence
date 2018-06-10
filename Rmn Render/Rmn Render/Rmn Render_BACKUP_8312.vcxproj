@@ -184,8 +184,13 @@ copy "$(CudaToolkitBinDir)\cudart*.dll" "$(OutDir)"</Command>
     </PostBuildEvent>
     <CudaCompile>
       <TargetMachinePlatform>64</TargetMachinePlatform>
+<<<<<<< HEAD
+      <Include>c:\Users\Mihai\Desktop\Computer Science\Licence\freeglut\include\;%(Include)</Include>
+      <AdditionalOptions>-Xptxas -v -Wno-deprecated-gpu-targets -arch sm_20 %(AdditionalOptions)</AdditionalOptions>
+=======
       <Include>$(SolutionDir)\freeglut\include\;%(Include)</Include>
       <AdditionalOptions>-Xptxas -v -Wno-deprecated-gpu-targets %(AdditionalOptions)</AdditionalOptions>
+>>>>>>> develop
       <CodeGeneration>compute_20,sm_20</CodeGeneration>
       <PtxAsOptionV>true</PtxAsOptionV>
     </CudaCompile>

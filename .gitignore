@@ -10,3 +10,8 @@ Rmn Render/x64/Data/head.cfg
 Rmn Render/x64/Data/head.dat
 Rmn Render/x64/Data/vertebra.cfg
 Rmn Render/x64/Data/vertebra.dat
+*.pdb
+*.obj
+*.log
+*.exe
+*.ilk

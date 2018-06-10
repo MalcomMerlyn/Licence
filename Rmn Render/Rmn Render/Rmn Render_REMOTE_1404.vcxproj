@@ -128,7 +128,7 @@ copy "$(CudaToolkitBinDir)\cudart*.dll" "$(OutDir)"</Command>
     <CudaCompile>
       <TargetMachinePlatform>64</TargetMachinePlatform>
       <Include>c:\Users\Mihai\Desktop\Computer Science\Licence\freeglut\include\;%(Include)</Include>
-      <AdditionalOptions>-Xptxas -v -Wno-deprecated-gpu-targets -arch sm_20 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>-Xptxas -v -Wno-deprecated-gpu-targets %(AdditionalOptions)</AdditionalOptions>
       <CodeGeneration>compute_20,sm_20</CodeGeneration>
       <PtxAsOptionV>true</PtxAsOptionV>
     </CudaCompile>
@@ -204,7 +204,6 @@ copy "$(CudaToolkitBinDir)\cudart*.dll" "$(OutDir)"</Command>
     <ClInclude Include="FpsDisplay.h" />
     <ClInclude Include="GLProcedures.h" />
     <ClInclude Include="GpuGlInteropAnim.h" />
-    <ClInclude Include="RmnDatasetFileLoader.h" />
     <ClInclude Include="VisualStudioCompilerErrors.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
