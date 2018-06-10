@@ -22,6 +22,12 @@
 #define B 2
 #define A 3
 
+#define pi 3.141592653f
+#define epsilon 0.001f
+#define step 0.5f
+#define ambient 0.3f
+#define diffuse 0.7f
+
 using std::cout;
 using std::cerr;
 using std::endl;
@@ -42,9 +48,19 @@ const int dim = 512;
 
 FpsDisplay fpsDisplay({imageHeigth, imageWidth});
 
-__device__ float4 colors[10];
-__device__ uint2 colormap[10];
-__device__ size_t colormapLength[1];
+__constant__ float4 colors[10];
+__constant__ uint2 colormap[10];
+__constant__ size_t colormapLength[1];
+
+__constant__ float4 plane[6];
+
+//__global__ void setPlane(size_t pos, float4 planeHost)
+//{
+//    plane[pos].x = planeHost.x;
+//    plane[pos].y = planeHost.y;
+//    plane[pos].z = planeHost.z;
+//    plane[pos].w = planeHost.w;
+//}
 
 __device__ unsigned int getColormapValue(size_t key)
 {
@@ -56,31 +72,31 @@ __device__ unsigned int getColormapColor(size_t key)
     return colormap[key].y;
 }
 
-__global__ void setColormapValue(size_t key, unsigned int value)
-{
-    colormap[key].x = value;
-    colormapLength[0]++;
-}
-
-__global__ void setColormapColor(size_t key, unsigned int color)
-{
-    colormap[key].y = color;
-}
+//__global__ void setColormapValue(size_t key, unsigned int value)
+//{
+//    colormap[key].x = value;
+//    colormapLength[0]++;
+//}
+//
+//__global__ void setColormapColor(size_t key, unsigned int color)
+//{
+//    colormap[key].y = color;
+//}
 
 __device__ float getColorValue(size_t key, size_t color)
 {
     return ((float*)(colors + key))[color];
 }
 
-__global__ void setColorValue(size_t key, size_t color, float value)
-{
-    ((float*)(colors + key))[color] = value;
-}
+//__global__ void setColorValue(size_t key, size_t color, float value)
+//{
+//    ((float*)(colors + key))[color] = value;
+//}
 
-__global__ void setColormapLength(size_t length)
-{
-    colormapLength[0] = length;
-}
+//__global__ void setColormapLength(size_t length)
+//{
+//    colormapLength[0] = length;
+//}
 
 __device__ int getPositionForColormapEntryValue(float value)
 {
@@ -92,12 +108,6 @@ __device__ int getPositionForColormapEntryValue(float value)
 
     return -1;
 }
-
-__device__ const float pi = 3.141592653f;
-__device__ const float epsilon = 0.001f;
-__device__ const float step = 0.1f;
-__device__ const float ambient = 0.3f;
-__device__ const float diffuse = 0.7f;
 
 __device__ int pointNormal(dim3 dataSize, float3 point)
 {
@@ -231,17 +241,6 @@ __global__ void renderFrame(unsigned char* rmnData, dim3 dataSize, uint2 imageDi
 
     if (x > imageWidth || y > imageHeight) return;
 
-    float dsx = dataSize.x, dsy = dataSize.y, dsz = dataSize.z;
-
-    float4 plane[6] = {
-        { 1.0f, 0.0f, 0.0f,  0.0f },
-        { 1.0f, 0.0f, 0.0f, -dsx  },
-        { 0.0f, 1.0f, 0.0f,  0.0f },
-        { 0.0f, 1.0f, 0.0f, -dsy  },
-        { 0.0f, 0.0f, 1.0f,  0.0f },
-        { 0.0f, 0.0f, 1.0f, -dsz  },
-    };
-
     float3 viewPointPosition;
     float rmnDataDiagonalLength = length(dataSize.x, dataSize.y, dataSize.z);
     viewPointPosition.x = 0.5f * dataSize.x + 3 * rmnDataDiagonalLength * sin(rotation * pi / 180);
@@ -300,17 +299,15 @@ __global__ void renderFrame(unsigned char* rmnData, dim3 dataSize, uint2 imageDi
         /* Intersection between a line and a plane using parametric equation */
         /* Line d : x - x1 / a = y - y1 / b = z - z1 / c and the plane P : Ax + By + Cz + D = 0; */
         /* t = - Ax1 + By1 + Cz1 + D / Aa +Bb + Cc x|y|z = x1|y1|z1 - a|b|c * t */
-        float numerator = plane[k].x * point0.x + plane[k].y * point0.y + plane[k].z * point0.z + plane[k].w;
-        float denominator = plane[k].x * point1.x + plane[k].y * point1.y + plane[k].z * point1.z;
 
         /* Ray is parallel or coplanar with the plane, do nothing and move on */
-        if (denominator == 0)
+        if (plane[k].x * point1.x + plane[k].y * point1.y + plane[k].z * point1.z == 0)
         {
             st = st < 1 ? 1 : st;
             continue;
         }
 
-        float t = -numerator / denominator;
+        float t = -(plane[k].x * point0.x + plane[k].y * point0.y + plane[k].z * point0.z + plane[k].w) / (plane[k].x * point1.x + plane[k].y * point1.y + plane[k].z * point1.z);
 
         /* The intersection is behind the camera */
         if (t < 0)
@@ -358,7 +355,7 @@ __global__ void renderFrame(unsigned char* rmnData, dim3 dataSize, uint2 imageDi
     }
 
     float3 prevNormal = { 0, 0, 0 }, point, normal, light, lastNormal;
-    float nlcos, color[3] = { 0, 0, 0 }, c[4], value;
+    float color[3] = { 0, 0, 0 }, c[4];
     int position, lastPosition = 0;
 
     for (float t = tmax; t >= tmin; t -= step)
@@ -367,8 +364,7 @@ __global__ void renderFrame(unsigned char* rmnData, dim3 dataSize, uint2 imageDi
         point.y = point0.y + point1.y * t;
         point.z = point0.z + point1.z * t;
 
-        value = meanPointValue(rmnData, dataSize, point);
-        position = getPositionForColormapEntryValue(value);
+        position = getPositionForColormapEntryValue(meanPointValue(rmnData, dataSize, point));
         if (position < 0) continue;
 
         c[R] = getColorValue(position, R);
@@ -379,18 +375,18 @@ __global__ void renderFrame(unsigned char* rmnData, dim3 dataSize, uint2 imageDi
         position = pointNormal(dataSize, point);
 
         /* COMMENT HERE TO REMOVE REGISTERY CACHING*/
-        //if (position != lastPosition)
-        //{
-            normal.x = normals[position].x;
-            normal.y = normals[position].y;
-            normal.z = normals[position].z;
-        //
-        //    lastPosition = position;
-        //}
-        //else
-        //{
-        //    normal = lastNormal;
-        //}
+        if (position != lastPosition)
+        {
+          normal.x = normals[position].x;
+          normal.y = normals[position].y;
+          normal.z = normals[position].z;
+        
+            lastPosition = position;
+        }
+        else
+        {
+            normal = lastNormal;
+        }
 
         if (fabsf(normal.x) <= epsilon && fabsf(normal.y) <= epsilon && fabsf(normal.z) <= epsilon)
         {
@@ -410,17 +406,17 @@ __global__ void renderFrame(unsigned char* rmnData, dim3 dataSize, uint2 imageDi
         light.z = lightPosition.z - point.z;
         light = normalizeVector(light);
 
-        nlcos = normal.x * light.x + normal.y * light.y + normal.z * light.z;
+        //nlcos = normal.x * light.x + normal.y * light.y + normal.z * light.z;
 
         c[R] *= ambient;
         c[G] *= ambient;
         c[B] *= ambient;
 
-        if (nlcos > 0)
+        if (normal.x * light.x + normal.y * light.y + normal.z * light.z > 0)
         {
-            c[R] += c[R] * diffuse * nlcos;
-            c[G] += c[G] * diffuse * nlcos;
-            c[B] += c[B] * diffuse * nlcos;
+            c[R] += c[R] * diffuse * (normal.x * light.x + normal.y * light.y + normal.z * light.z);
+            c[G] += c[G] * diffuse * (normal.x * light.x + normal.y * light.y + normal.z * light.z);
+            c[B] += c[B] * diffuse * (normal.x * light.x + normal.y * light.y + normal.z * light.z);
         }
 
         color[R] = composeRGBA(color[R], c[R], c[A]);
@@ -506,38 +502,58 @@ int main(int argc, char** argv)
 
         rmnDatasetFileLoader.loadDataset();
 
-        for (size_t c = 0; c < rmnDatasetFileLoader.getColor().size(); c++)
-        {
-            setColorValue << <1, 1 >> > (c, R, rmnDatasetFileLoader.getColor()[c].r);
-            setColorValue << <1, 1 >> > (c, G, rmnDatasetFileLoader.getColor()[c].g);
-            setColorValue << <1, 1 >> > (c, B, rmnDatasetFileLoader.getColor()[c].b);
-            setColorValue << <1, 1 >> > (c, A, rmnDatasetFileLoader.getColor()[c].a);
-        }
+        //for (size_t c = 0; c < rmnDatasetFileLoader.getColor().size(); c++)
+        //{
+        //    setColorValue << <1, 1 >> > (c, R, rmnDatasetFileLoader.getColor()[c].r);
+        //    setColorValue << <1, 1 >> > (c, G, rmnDatasetFileLoader.getColor()[c].g);
+        //    setColorValue << <1, 1 >> > (c, B, rmnDatasetFileLoader.getColor()[c].b);
+        //    setColorValue << <1, 1 >> > (c, A, rmnDatasetFileLoader.getColor()[c].a);
+        //}
 
-        //cudaError = cudaMemcpyToSymbol(colors, rmnDatasetFileLoader.getColor().data(), rmnDatasetFileLoader.getColor().size() * sizeof(Color));
-        //if (cudaError != cudaSuccess)
-        //    throw runtime_error(makeCudaErrorMessage("cudaMemcpyToSymbol", cudaError, __FILE__, __LINE__));
+        cudaError = cudaMemcpyToSymbol(colors, rmnDatasetFileLoader.getColor().data(), rmnDatasetFileLoader.getColor().size() * sizeof(Color));
+        if (cudaError != cudaSuccess)
+            throw runtime_error(makeCudaErrorMessage("cudaMemcpyToSymbol", cudaError, __FILE__, __LINE__));
 
-        for (size_t c = 0; c < rmnDatasetFileLoader.getColormap().size(); c++)
-        {
-            if (c % 2 == 0)
-                setColormapValue << <1, 1 >> > (c / 2, rmnDatasetFileLoader.getColormap()[c]);
-            else
-                setColormapColor << <1, 1 >> > (c / 2, rmnDatasetFileLoader.getColormap()[c]);
-        }
-
-        setColormapLength << <1, 1 >> > (rmnDatasetFileLoader.getColormap().size());
-
-        //cudaError = cudaMemcpyToSymbol(colormap, rmnDatasetFileLoader.getColormap().data(), rmnDatasetFileLoader.getColormap().size() * sizeof(unsigned int));
-        //if (cudaError != cudaSuccess)
-        //    throw runtime_error(makeCudaErrorMessage("cudaMemcpyToSymbol", cudaError, __FILE__, __LINE__));
+        //for (size_t c = 0; c < rmnDatasetFileLoader.getColormap().size(); c++)
+        //{
+        //    if (c % 2 == 0)
+        //        setColormapValue << <1, 1 >> > (c / 2, rmnDatasetFileLoader.getColormap()[c]);
+        //    else
+        //        setColormapColor << <1, 1 >> > (c / 2, rmnDatasetFileLoader.getColormap()[c]);
+        //}
         //
-        //size_t colormapSize = rmnDatasetFileLoader.getColormap().size();
-        //cudaError = cudaMemcpyToSymbol(colormapLength, &colormapSize, sizeof(size_t));
-        //if (cudaError != cudaSuccess)
-        //    throw runtime_error(makeCudaErrorMessage("cudaMemcpyToSymbol", cudaError, __FILE__, __LINE__));
+        //setColormapLength << <1, 1 >> > (rmnDatasetFileLoader.getColormap().size());
+
+        cudaError = cudaMemcpyToSymbol(colormap, rmnDatasetFileLoader.getColormap().data(), rmnDatasetFileLoader.getColormap().size() * sizeof(unsigned int));
+        if (cudaError != cudaSuccess)
+            throw runtime_error(makeCudaErrorMessage("cudaMemcpyToSymbol", cudaError, __FILE__, __LINE__));
+        
+        size_t colormapSize = rmnDatasetFileLoader.getColormap().size();
+        cudaError = cudaMemcpyToSymbol(colormapLength, &colormapSize, sizeof(size_t));
+        if (cudaError != cudaSuccess)
+            throw runtime_error(makeCudaErrorMessage("cudaMemcpyToSymbol", cudaError, __FILE__, __LINE__));
 
         rmnDim = rmnDatasetFileLoader.getRmnDatasetDimensions();
+
+        float dsx = rmnDim.x, dsy = rmnDim.y, dsz = rmnDim.z;
+
+        float4 planeHost[6] = {
+            { 1.0f, 0.0f, 0.0f,  0.0f },
+            { 1.0f, 0.0f, 0.0f, -dsx },
+            { 0.0f, 1.0f, 0.0f,  0.0f },
+            { 0.0f, 1.0f, 0.0f, -dsy },
+            { 0.0f, 0.0f, 1.0f,  0.0f },
+            { 0.0f, 0.0f, 1.0f, -dsz },
+        };
+
+        cudaError = cudaMemcpyToSymbol(plane, planeHost, 6 * sizeof(float4));
+        if (cudaError != cudaSuccess)
+            throw runtime_error(makeCudaErrorMessage("cudaMemcpyToSymbol", cudaError, __FILE__, __LINE__));
+
+        //for (size_t i = 0; i < 6; i++)
+        //{
+        //    setPlane << <1, 1 >> > (i, planeHost[i]);
+        //}
 
         //int nr0 = 0, nr1 = 0;
         //for (int i = 0; i < rmnDim.x * rmnDim.y * rmnDim.z; i++)
