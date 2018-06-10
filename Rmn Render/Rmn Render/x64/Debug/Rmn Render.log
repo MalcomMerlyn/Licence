@@ -1,0 +1,74 @@
+﻿  Compiling CUDA source file FpsDisplay.cu...
+  Compiling CUDA source file kernel.cu...
+  
+  C:\Users\Batman\Desktop\Computer Science\Licence\Rmn Render\Rmn Render>"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v8.0\bin\nvcc.exe" -gencode=arch=compute_20,code=\"sm_20,compute_20\" --use-local-env --cl-version 2015 -ccbin "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\bin\x86_amd64"  -I"c:\Users\Mihai\Desktop\Computer Science\Licence\freeglut\include" -I"C:\Users\Batman\Desktop\Computer Science\Licence\Rmn Render\freeglut\lib\x64" -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v8.0\include" -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v8.0\include" -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v8.0\include"  -G   --keep-dir x64\Debug -maxrregcount=0 --ptxas-options=-v --machine 64 --compile -cudart static -Xptxas -v -Wno-deprecated-gpu-targets -g   -DWIN32 -DWIN64 -D_DEBUG -D_CONSOLE -D_MBCS -Xcompiler "/EHsc /W3 /nologo /Od /FS /Zi /RTC1 /MDd " -o x64\Debug\FpsDisplay.cu.obj "C:\Users\Batman\Desktop\Computer Science\Licence\Rmn Render\Rmn Render\FpsDisplay.cu" 
+  
+  C:\Users\Batman\Desktop\Computer Science\Licence\Rmn Render\Rmn Render>"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v8.0\bin\nvcc.exe" -gencode=arch=compute_20,code=\"sm_20,compute_20\" --use-local-env --cl-version 2015 -ccbin "C:\Program Files (x86)\Microsoft Visual Studio 14.0\VC\bin\x86_amd64"  -I"c:\Users\Mihai\Desktop\Computer Science\Licence\freeglut\include" -I"C:\Users\Batman\Desktop\Computer Science\Licence\Rmn Render\freeglut\lib\x64" -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v8.0\include" -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v8.0\include" -I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v8.0\include"  -G   --keep-dir x64\Debug -maxrregcount=0 --ptxas-options=-v --machine 64 --compile -cudart static -Xptxas -v -Wno-deprecated-gpu-targets -g   -DWIN32 -DWIN64 -D_DEBUG -D_CONSOLE -D_MBCS -Xcompiler "/EHsc /W3 /nologo /Od /FS /Zi /RTC1 /MDd " -o x64\Debug\kernel.cu.obj "C:\Users\Batman\Desktop\Computer Science\Licence\Rmn Render\Rmn Render\kernel.cu" 
+C:/Users/Batman/Desktop/Computer Science/Licence/Rmn Render/Rmn Render/kernel.cu(41): warning : variable "dim" was declared but never referenced
+  ptxas info    : 96 bytes gmem, 32 bytes cmem[14]
+  ptxas info    : Compiling entry function '_Z14drawDigitPixelPc5uint2yS0_P6uchar4' for 'sm_20'
+  ptxas info    : Function properties for _Z14drawDigitPixelPc5uint2yS0_P6uchar4
+      16 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+  ptxas info    : Used 20 registers, 16 bytes cumulative stack size, 72 bytes cmem[0]
+  ptxas info    : Compiling entry function '_Z14drawPointPixelPc5uint2S0_P6uchar4' for 'sm_20'
+  ptxas info    : Function properties for _Z14drawPointPixelPc5uint2S0_P6uchar4
+      16 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+  ptxas info    : Used 18 registers, 16 bytes cumulative stack size, 64 bytes cmem[0]
+  FpsDisplay.cu
+C:/Users/Batman/Desktop/Computer Science/Licence/Rmn Render/Rmn Render/kernel.cu(41): warning : variable "dim" was declared but never referenced
+  ptxas info    : 1052 bytes gmem, 272 bytes cmem[2], 192 bytes cmem[14]
+  ptxas info    : Function properties for _Z16colorFloatToBytef
+      0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+  ptxas info    : Function properties for _Z3sinf
+      48 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+  ptxas info    : Function properties for _Z13getColorValueyy
+      0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+  ptxas info    : Function properties for _Z26imageCoordonateToViewPlaneyyf
+      8 bytes stack frame, 8 bytes spill stores, 8 bytes spill loads
+  ptxas info    : Function properties for _Z16getColormapValuey
+      0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+  ptxas info    : Function properties for _Z12vectorLength6float3
+      16 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+  ptxas info    : Function properties for _Z11pointNormal4dim36float3
+      32 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+  ptxas info    : Function properties for _Z3cosf
+      48 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+  ptxas info    : Compiling entry function '_Z16calculateNormalsPh4dim3P6float3' for 'sm_20'
+  ptxas info    : Function properties for _Z16calculateNormalsPh4dim3P6float3
+      80 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+  ptxas info    : Used 27 registers, 144 bytes cumulative stack size, 64 bytes cmem[0]
+  ptxas info    : Function properties for _Z6lengthfff
+      0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+  ptxas info    : Function properties for _Z4sqrtf
+      0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+  ptxas info    : Function properties for _Z32getPositionForColormapEntryValuef
+      16 bytes stack frame, 12 bytes spill stores, 12 bytes spill loads
+  ptxas info    : Function properties for _ZN4dim3C1Ejjj
+      0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+  ptxas info    : Function properties for _Z14meanPointValuePh4dim36float3
+      32 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+  ptxas info    : Function properties for _Z16getColormapColory
+      0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+  ptxas info    : Function properties for _Z15normalizeVector6float3
+      48 bytes stack frame, 12 bytes spill stores, 12 bytes spill loads
+  ptxas info    : Function properties for _Z11composeRGBAfff
+      0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+  ptxas info    : Function properties for _Z5floorf
+      0 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+  ptxas info    : Compiling entry function '_Z11renderFramePh4dim35uint2jP6float3P6uchar4' for 'sm_20'
+  ptxas info    : Function properties for _Z11renderFramePh4dim35uint2jP6float3P6uchar4
+      416 bytes stack frame, 0 bytes spill stores, 0 bytes spill loads
+  ptxas info    : Used 53 registers, 480 bytes cumulative stack size, 88 bytes cmem[0]
+  kernel.cu
+  Microsoft (R) Incremental Linker Version 14.00.24215.1
+  Copyright (C) Microsoft Corporation.  All rights reserved.
+  
+  "/OUT:C:\Users\Batman\Desktop\Computer Science\Licence\Rmn Render\x64\Debug\Rmn Render.exe" /INCREMENTAL "/LIBPATH:C:\Users\Mihai\Desktop\Computer Science\Licence\freeglut\lib\x64\\" "/LIBPATH:C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v8.0\lib\x64" "/LIBPATH:C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v8.0\lib\x64" cudart.lib kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib freeglut.lib kernel32.lib user32.lib gdi32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /MANIFEST "/MANIFESTUAC:level='asInvoker' uiAccess='false'" /manifest:embed /DEBUG "/PDB:C:\Users\Batman\Desktop\Computer Science\Licence\Rmn Render\x64\Debug\Rmn Render.pdb" /SUBSYSTEM:CONSOLE /SWAPRUN:NET /TLBID:1 /DYNAMICBASE /NXCOMPAT "/IMPLIB:C:\Users\Batman\Desktop\Computer Science\Licence\Rmn Render\x64\Debug\Rmn Render.lib" /MACHINE:X64 x64\Debug\FpsDisplay.cu.obj 
+  x64\Debug\kernel.cu.obj 
+  x64\Debug\RmnDatasetFileLoader.obj 
+  Rmn Render.vcxproj -> C:\Users\Batman\Desktop\Computer Science\Licence\Rmn Render\x64\Debug\Rmn Render.exe
+  Rmn Render.vcxproj -> C:\Users\Batman\Desktop\Computer Science\Licence\Rmn Render\x64\Debug\Rmn Render.pdb (Full PDB)
+  copy "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v8.0\bin\cudart*.dll" "C:\Users\Batman\Desktop\Computer Science\Licence\Rmn Render\x64\Debug\"
+  C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v8.0\bin\cudart32_80.dll
+  C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v8.0\bin\cudart64_80.dll
+          2 file(s) copied.
