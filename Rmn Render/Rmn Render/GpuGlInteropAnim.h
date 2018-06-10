@@ -154,6 +154,9 @@ private:
         {
         case 27:
             getInstance()->Destroy();
+
+            cudaDeviceReset();
+
             exit(0);
         }
     }
