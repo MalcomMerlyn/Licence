@@ -25,7 +25,7 @@
 
 #define pi 3.141592653f
 #define epsilon 0.001f
-#define step 0.5f
+#define step 0.1f
 #define ambient 0.3f
 #define diffuse 0.7f
 
@@ -211,14 +211,17 @@ __device__ float meanPointValue(unsigned char* rmnData, dim3 dataSize, float3 po
 
     unsigned char c000, c001, c010, c011, c100, c101, c110, c111;
 
-    c000 = tex3D(textureRmnData, i + 0, j + 0, k + 0);
-    c001 = tex3D(textureRmnData, i + 0, j + 0, k + 1);
-    c010 = tex3D(textureRmnData, i + 0, j + 1, k + 0);
-    c011 = tex3D(textureRmnData, i + 0, j + 1, k + 1);
-    c100 = tex3D(textureRmnData, i + 1, j + 0, k + 0);
-    c101 = tex3D(textureRmnData, i + 1, j + 0, k + 1);
-    c110 = tex3D(textureRmnData, i + 1, j + 1, k + 0);
-    c111 = tex3D(textureRmnData, i + 1, j + 1, k + 1);
+    //if (i >= 0 && i + 1 < dataSize.x && j >= 0 && j + 1 < dataSize.y && k >= 0 && k + 1 < dataSize.z)
+    //{
+        c000 = tex3D(textureRmnData, i + 0, j + 0, k + 0);
+        c001 = tex3D(textureRmnData, i + 0, j + 0, k + 1);
+        c010 = tex3D(textureRmnData, i + 0, j + 1, k + 0);
+        c011 = tex3D(textureRmnData, i + 0, j + 1, k + 1);
+        c100 = tex3D(textureRmnData, i + 1, j + 0, k + 0);
+        c101 = tex3D(textureRmnData, i + 1, j + 0, k + 1);
+        c110 = tex3D(textureRmnData, i + 1, j + 1, k + 0);
+        c111 = tex3D(textureRmnData, i + 1, j + 1, k + 1);
+    //}
     
     float c00 = c000 * (1.0f - xf) + c100 * xf;
     float c10 = c010 * (1.0f - xf) + c110 * xf;
