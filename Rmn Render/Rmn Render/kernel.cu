@@ -54,7 +54,7 @@ cudaArray* dev_rmnDataArray = 0;
 FpsDisplay fpsDisplay({imageHeigth, imageWidth});
 
 __constant__ float4 colors[10];
-__constant__ uint2 colormap[10];
+__constant__ unsigned int colormap[256];
 __constant__ size_t colormapLength[1];
 
 __constant__ float4 plane[6];
@@ -67,15 +67,15 @@ __constant__ float4 plane[6];
 //    plane[pos].w = planeHost.w;
 //}
 
-__device__ unsigned int getColormapValue(size_t key)
-{
-    return colormap[key].x;
-}
-
-__device__ unsigned int getColormapColor(size_t key)
-{
-    return colormap[key].y;
-}
+//__device__ unsigned int getColormapValue(size_t key)
+//{
+//    return colormap[key].x;
+//}
+//
+//__device__ unsigned int getColormapColor(size_t key)
+//{
+//    return colormap[key].y;
+//}
 
 //__global__ void setColormapValue(size_t key, unsigned int value)
 //{
@@ -105,13 +105,9 @@ __device__ float getColorValue(size_t key, size_t color)
 
 __device__ int getPositionForColormapEntryValue(float value)
 {
-    for (size_t i = 0; i < colormapLength[0]; i++)
-    {
-        if (getColormapValue(i) > value)
-            return i - 1;
-    }
-
-    return -1;
+    int pos = value;
+    
+    return colormap[pos % 256];
 }
 
 __device__ int pointNormal(dim3 dataSize, float3 point)
@@ -534,11 +530,25 @@ int main(int argc, char** argv)
         //
         //setColormapLength << <1, 1 >> > (rmnDatasetFileLoader.getColormap().size());
 
-        cudaError = cudaMemcpyToSymbol(colormap, rmnDatasetFileLoader.getColormap().data(), rmnDatasetFileLoader.getColormap().size() * sizeof(unsigned int));
+        size_t colormapSize = rmnDatasetFileLoader.getColormap().size();
+        unsigned int host_colormap[256];
+
+        for (size_t i = 0; i < 256; i++)
+        {
+            for (size_t j = 0; j < colormapSize; j += 2)
+            {
+                if (i < rmnDatasetFileLoader.getColormap()[j+2])
+                {
+                    host_colormap[i] = j / 2;
+                    break;
+                }
+            }
+        }
+
+        cudaError = cudaMemcpyToSymbol(colormap, host_colormap, 256 * sizeof(unsigned int));
         if (cudaError != cudaSuccess)
             throw runtime_error(makeCudaErrorMessage("cudaMemcpyToSymbol", cudaError, __FILE__, __LINE__));
         
-        size_t colormapSize = rmnDatasetFileLoader.getColormap().size();
         cudaError = cudaMemcpyToSymbol(colormapLength, &colormapSize, sizeof(size_t));
         if (cudaError != cudaSuccess)
             throw runtime_error(makeCudaErrorMessage("cudaMemcpyToSymbol", cudaError, __FILE__, __LINE__));
