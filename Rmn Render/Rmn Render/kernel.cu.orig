@@ -472,7 +472,11 @@ __host__ void renderFrame(uchar4* pixels, void* parameters, size_t ticks)
     static int i = 0;
 
     meanFps += fps;
+<<<<<<< HEAD
     if (fps < minFps && kernelParams->rotation > 5) 
+=======
+    if (fps < minFps)
+>>>>>>> develop
         minFps = fps;
 
     f[i] = fps; i++;
@@ -488,8 +492,13 @@ __host__ void renderFrame(uchar4* pixels, void* parameters, size_t ticks)
             stdDev += abs(f[k] - meanFps);
 
         cout << "Minimum fps " << minFps << endl;
+<<<<<<< HEAD
+        cout << "Mean fps " << meanFps / 360 << endl;
+        cudaDeviceReset();
+=======
         cout << "Mean fps " << meanFps << endl;
         cout << "Standard dev fps " << stdDev / 360 << endl;
+>>>>>>> develop
         exit(0);
     }
 }
