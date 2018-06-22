@@ -470,7 +470,11 @@ __host__ void renderFrame(uchar4* pixels, void* parameters, size_t ticks)
     static int i = 0;
 
     meanFps += fps;
+<<<<<<< HEAD
     if (fps < minFps && kernelParams->rotation > 5) 
+=======
+    if (fps < minFps)
+>>>>>>> develop
         minFps = fps;
 
     f[i] = fps; i++;
