@@ -462,15 +462,28 @@ __host__ void renderFrame(uchar4* pixels, void* parameters, size_t ticks)
     float fps = 1000 / milliseconds;
     fpsDisplay.displayFps(pixels, fps);
 
+    static float f[360];
+    static int i = 0;
+
     meanFps += fps;
-    if (fps < minFps) 
+    if (fps < minFps)
         minFps = fps;
+
+    f[i] = fps; i++;
 
     kernelParams->rotation += 1;
     if (kernelParams->rotation == 359)
     {
+        float stdDev = 0;
+
+        meanFps = meanFps / 360;
+
+        for (int k = 0; k < 360; k++)
+            stdDev += abs(f[k] - meanFps);
+
         cout << "Minimum fps " << minFps << endl;
-        cout << "Mean fps " << meanFps / 360 << endl;
+        cout << "Mean fps " << meanFps << endl;
+        cout << "Standard dev fps " << stdDev / 360 << endl;
         exit(0);
     }
 }
