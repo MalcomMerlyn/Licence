@@ -407,7 +407,12 @@ __host__ void renderFrame(uchar4* pixels, void* parameters, size_t ticks)
 
     cudaEventRecord(start);
 
+<<<<<<< HEAD
+    renderFrame << <grids, threads >> > 
+        (kernelParams->dev_rmnData, kernelParams->rmnDim, kernelParams->imageDim, kernelParams->rotation, kernelParams->dev_normals, pixels);
+=======
     renderFrame << <grids, threads >> > (kernelParams->dev_rmnData, kernelParams->rmnDim, kernelParams->imageDim, kernelParams->rotation, kernelParams->dev_normals, pixels, dev_r, dev_g, dev_b, dev_a);
+>>>>>>> fast_color_mapping_texture
 
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
