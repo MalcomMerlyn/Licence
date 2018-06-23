@@ -25,7 +25,7 @@
 
 #define pi 3.141592653f
 #define epsilon 0.001f
-#define step 0.5f
+#define step 1.5
 #define ambient 0.3f
 #define diffuse 0.7f
 
@@ -76,7 +76,7 @@ __device__ int pointNormal(dim3 dataSize, float3 point)
 
 __device__ float composeRGBA(float prev, float color, float alpha)
 {
-    return prev * (1 - alpha) + color * alpha;
+    return prev * alpha + color * (1 - alpha);
 }
 
 __device__ unsigned char colorFloatToByte(float color)
@@ -124,24 +124,53 @@ __global__ void calculateNormals(unsigned char* rmnData, dim3 dataSize, float3* 
     float3 m, p, normal;
     dim3 s;
 
+    int off[9][2] = {{-1, -1}, {-1, 0}, {-1, 1}, {0, -1}, {0, 0}, {0, 1}, {1, -1}, {1, 0}, {1, 1}};
+
     s.x = dataSize.y * dataSize.z;
     s.y = dataSize.z;
     s.z = 1;
 
-    if (i >= dataSize.x || j >= dataSize.y) return;
+    const float mul = 0.4f;
 
-    for (size_t k = 0; k < dataSize.z; k++)
+    if (i == 0 || j == 0 || i >= dataSize.x - 1 || j >= dataSize.y - 1) return;
+
+    for (size_t k = 1; k < dataSize.z - 1; k++)
     {
+        // Add the cell above and below
         m.x = i == 0 ? 0 : rmnData[(i - 1) * s.x + (j - 0) * s.y + (k - 0) * s.z];
         p.x = i == dataSize.x - 1 ? 0 : rmnData[(i + 1) * s.x + (j + 0) * s.y + (k + 0) * s.z];
-        normal.x = p.x - m.x;
 
         m.y = j == 0 ? 0 : rmnData[(i - 0) * s.x + (j - 1) * s.y + (k - 0) * s.z];
         p.y = j == dataSize.y - 1 ? 0 : rmnData[(i + 0) * s.x + (j + 1) * s.y + (k + 0) * s.z];
-        normal.y = p.y - m.y;
 
         m.z = k == 0 ? 0 : rmnData[(i - 0) * s.x + (j - 0) * s.y + (k - 1) * s.z];
-        p.z = k == dataSize.z - 1 ? 0 : rmnData[(i + 0) * s.x + (j + 0) * s.y + (k + 1) * s.z];
+        p.z = k == dataSize.z - 1 ? 0 : rmnData[(i + 0) * s.x + (j +0) * s.y + (k + 1) * s.z];
+
+        // Add the second cell above and below
+        m.x += i - 2 < 0 ? 0 : rmnData[(i - 2) * s.x + (j - 0) * s.y + (k - 0) * s.z];
+        p.x += i + 2 == dataSize.x ? 0 : rmnData[(i + 2) * s.x + (j + 0) * s.y + (k + 0) * s.z];
+            
+        m.y += j - 2 < 0 ? 0 : rmnData[(i - 0) * s.x + (j - 2) * s.y + (k - 0) * s.z];
+        p.y += j + 2 == dataSize.y ? 0 : rmnData[(i + 0) * s.x + (j + 2) * s.y + (k + 0) * s.z];
+            
+        m.z += k - 2 < 0 ? 0 : rmnData[(i - 0) * s.x + (j - 0) * s.y + (k - 2) * s.z];
+        p.z += k + 2 > dataSize.z ? 0 : rmnData[(i + 0) * s.x + (j + 0) * s.y + (k + 2) * s.z];
+
+        // Add the cells sorounding the cell above and bellow with factor mul
+        for (int o = 0; o < 9; o++)
+        {
+            m.x += mul * (i == 0 ? 0 : rmnData[(i - 1) * s.x + (j - off[o][0]) * s.y + (k - off[o][1]) * s.z]);
+            p.x += mul * (i == dataSize.x - 1 ? 0 : rmnData[(i + 1) * s.x + (j + off[o][0]) * s.y + (k + off[o][1]) * s.z]);
+                         
+            m.y += mul * (j == 0 ? 0 : rmnData[(i - off[o][0]) * s.x + (j - 1) * s.y + (k - off[o][1]) * s.z]);
+            p.y += mul * (j == dataSize.y - 1 ? 0 : rmnData[(i + off[o][0]) * s.x + (j + 1) * s.y + (k + off[o][1]) * s.z]);
+                         
+            m.z += mul * (k == 0 ? 0 : rmnData[(i - off[o][0]) * s.x + (j - off[o][1]) * s.y + (k - 1) * s.z]);
+            p.z += mul * (k == dataSize.z - 1 ? 0 : rmnData[(i + off[o][0]) * s.x + (j + off[o][1]) * s.y + (k + 1) * s.z]);
+        }
+
+        normal.x = p.x - m.x;
+        normal.y = p.y - m.y;
         normal.z = p.z - m.z;
 
         normals[i * s.x + j * s.y + k * s.z] = normalizeVector(normal);
@@ -309,10 +338,10 @@ __global__ void renderFrame(unsigned char* rmnData, dim3 dataSize, uint2 imageDi
     }
 
     float3 prevNormal = { 0, 0, 0 }, point, normal, light, lastNormal;
-    float color[3] = { 0, 0, 0 }, c[4];
+    float color[3] = { 0, 0, 0 }, c[4], float stop = 0;;
     int position, lastPosition = 0;
 
-    for (float t = tmax; t >= tmin; t -= step)
+    for (float t = tmin; t < tmax; t += step)
     {
         point.x = point0.x + point1.x * t;
         point.y = point0.y + point1.y * t;
@@ -327,6 +356,11 @@ __global__ void renderFrame(unsigned char* rmnData, dim3 dataSize, uint2 imageDi
         c[G] = g[position];
         c[B] = b[position];
         c[A] = a[position];
+
+        if (c[A] != 1.0f && stop == 0)
+            stop = t;
+        else if (c[A] == 1.0f)
+            continue;
 
         position = pointNormal(dataSize, point);
 
@@ -378,6 +412,9 @@ __global__ void renderFrame(unsigned char* rmnData, dim3 dataSize, uint2 imageDi
         color[R] = composeRGBA(color[R], c[R], c[A]);
         color[G] = composeRGBA(color[G], c[G], c[A]);
         color[B] = composeRGBA(color[B], c[B], c[A]);
+
+        if (t > 10 * step + stop && stop != 0)
+            break;
     }
 
     ptr[offset].x = colorFloatToByte(color[R]);
