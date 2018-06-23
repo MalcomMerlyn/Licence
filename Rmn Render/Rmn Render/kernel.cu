@@ -25,7 +25,7 @@
 
 #define pi 3.141592653f
 #define epsilon 0.001f
-#define step 1.5
+#define step 3
 #define ambient 0.3f
 #define diffuse 0.7f
 
