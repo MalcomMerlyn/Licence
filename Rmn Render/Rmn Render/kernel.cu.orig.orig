@@ -25,7 +25,11 @@
 
 #define pi 3.141592653f
 #define epsilon 0.001f
+<<<<<<< HEAD
 #define step 0.5f
+=======
+#define step 0.1f
+>>>>>>> texture_memory_3D
 #define ambient 0.3f
 #define diffuse 0.7f
 
@@ -53,6 +57,7 @@ cudaArray* dev_rmnDataArray = 0;
 
 FpsDisplay fpsDisplay({imageHeigth, imageWidth});
 
+<<<<<<< HEAD
 
 float* dev_r;
 float* dev_g;
@@ -62,6 +67,68 @@ float* dev_a;
 
 __constant__ float4 plane[6];
 
+=======
+__constant__ float4 colors[10];
+__constant__ uint2 colormap[10];
+__constant__ size_t colormapLength[1];
+
+__constant__ float4 plane[6];
+
+//__global__ void setPlane(size_t pos, float4 planeHost)
+//{
+//    plane[pos].x = planeHost.x;
+//    plane[pos].y = planeHost.y;
+//    plane[pos].z = planeHost.z;
+//    plane[pos].w = planeHost.w;
+//}
+
+__device__ unsigned int getColormapValue(size_t key)
+{
+    return colormap[key].x;
+}
+
+__device__ unsigned int getColormapColor(size_t key)
+{
+    return colormap[key].y;
+}
+
+//__global__ void setColormapValue(size_t key, unsigned int value)
+//{
+//    colormap[key].x = value;
+//    colormapLength[0]++;
+//}
+//
+//__global__ void setColormapColor(size_t key, unsigned int color)
+//{
+//    colormap[key].y = color;
+//}
+
+__device__ float getColorValue(size_t key, size_t color)
+{
+    return ((float*)(colors + key))[color];
+}
+
+//__global__ void setColorValue(size_t key, size_t color, float value)
+//{
+//    ((float*)(colors + key))[color] = value;
+//}
+
+//__global__ void setColormapLength(size_t length)
+//{
+//    colormapLength[0] = length;
+//}
+
+__device__ int getPositionForColormapEntryValue(float value)
+{
+    for (size_t i = 0; i < colormapLength[0]; i++)
+    {
+        if (getColormapValue(i) > value)
+            return i - 1;
+    }
+
+    return -1;
+}
+>>>>>>> texture_memory_3D
 
 __device__ int pointNormal(dim3 dataSize, float3 point)
 {
@@ -185,7 +252,11 @@ __device__ float meanPointValue(unsigned char* rmnData, dim3 dataSize, float3 po
     return c;
 }
 
+<<<<<<< HEAD
 __global__ void renderFrame(unsigned char* rmnData, dim3 dataSize, uint2 imageDim, unsigned int rotation, float3* normals, uchar4* ptr, float* r, float* g, float* b, float* a)
+=======
+__global__ void renderFrame(unsigned char* rmnData, dim3 dataSize, uint2 imageDim, unsigned int rotation, float3* normals, uchar4* ptr)
+>>>>>>> texture_memory_3D
 {
     size_t x = threadIdx.x + blockIdx.x * blockDim.x;
     size_t y = threadIdx.y + blockIdx.y * blockDim.y;
@@ -318,6 +389,7 @@ __global__ void renderFrame(unsigned char* rmnData, dim3 dataSize, uint2 imageDi
         point.y = point0.y + point1.y * t;
         point.z = point0.z + point1.z * t;
 
+<<<<<<< HEAD
         //position = getPositionForColormapEntryValue(meanPointValue(rmnData, dataSize, point));
         //if (position < 0) continue;
 
@@ -327,6 +399,15 @@ __global__ void renderFrame(unsigned char* rmnData, dim3 dataSize, uint2 imageDi
         c[G] = g[position];
         c[B] = b[position];
         c[A] = a[position];
+=======
+        position = getPositionForColormapEntryValue(meanPointValue(rmnData, dataSize, point));
+        if (position < 0) continue;
+
+        c[R] = getColorValue(position, R);
+        c[G] = getColorValue(position, G);
+        c[B] = getColorValue(position, B);
+        c[A] = getColorValue(position, A);
+>>>>>>> texture_memory_3D
 
         position = pointNormal(dataSize, point);
 
@@ -407,7 +488,17 @@ __host__ void renderFrame(uchar4* pixels, void* parameters, size_t ticks)
 
     cudaEventRecord(start);
 
+<<<<<<< HEAD
+<<<<<<< HEAD
+    renderFrame << <grids, threads >> > 
+        (kernelParams->dev_rmnData, kernelParams->rmnDim, kernelParams->imageDim, kernelParams->rotation, kernelParams->dev_normals, pixels);
+=======
     renderFrame << <grids, threads >> > (kernelParams->dev_rmnData, kernelParams->rmnDim, kernelParams->imageDim, kernelParams->rotation, kernelParams->dev_normals, pixels, dev_r, dev_g, dev_b, dev_a);
+>>>>>>> fast_color_mapping_texture
+=======
+    renderFrame << <grids, threads >> > 
+        (kernelParams->dev_rmnData, kernelParams->rmnDim, kernelParams->imageDim, kernelParams->rotation, kernelParams->dev_normals, pixels);
+>>>>>>> texture_memory_3D
 
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
@@ -418,11 +509,27 @@ __host__ void renderFrame(uchar4* pixels, void* parameters, size_t ticks)
     float fps = 1000 / milliseconds;
     fpsDisplay.displayFps(pixels, fps);
 
+<<<<<<< HEAD
+    meanFps += fps;
+    if (fps < minFps && kernelParams->rotation > 5) 
+        minFps = fps;
+
+    kernelParams->rotation += 1;
+    if (kernelParams->rotation == 359)
+    {
+        cout << "Minimum fps " << minFps << endl;
+        cout << "Mean fps " << meanFps / 360 << endl;
+        cudaDeviceReset();
+=======
     static float f[360];
     static int i = 0;
 
     meanFps += fps;
+<<<<<<< HEAD
     if (fps < minFps && kernelParams->rotation > 5) 
+=======
+    if (fps < minFps)
+>>>>>>> develop
         minFps = fps;
 
     f[i] = fps; i++;
@@ -438,9 +545,14 @@ __host__ void renderFrame(uchar4* pixels, void* parameters, size_t ticks)
             stdDev += abs(f[k] - meanFps);
 
         cout << "Minimum fps " << minFps << endl;
+<<<<<<< HEAD
+        cout << "Mean fps " << meanFps / 360 << endl;
+        cudaDeviceReset();
+=======
         cout << "Mean fps " << meanFps << endl;
         cout << "Standard dev fps " << stdDev / 360 << endl;
-        cudaDeviceReset();
+>>>>>>> develop
+>>>>>>> texture_memory_3D
         exit(0);
     }
 }
@@ -475,6 +587,7 @@ int main(int argc, char** argv)
 
         rmnDatasetFileLoader.loadDataset();
 
+<<<<<<< HEAD
         //cudaError = cudaMemcpyToSymbol(colors, rmnDatasetFileLoader.getColor().data(), rmnDatasetFileLoader.getColor().size() * sizeof(Color));
         //if (cudaError != cudaSuccess)
         //    throw runtime_error(makeCudaErrorMessage("cudaMemcpyToSymbol", cudaError, __FILE__, __LINE__));
@@ -546,6 +659,39 @@ int main(int argc, char** argv)
             throw runtime_error(makeCudaErrorMessage("cudaMemcpyToSymbol", cudaError, __FILE__, __LINE__));
 
 
+=======
+        //for (size_t c = 0; c < rmnDatasetFileLoader.getColor().size(); c++)
+        //{
+        //    setColorValue << <1, 1 >> > (c, R, rmnDatasetFileLoader.getColor()[c].r);
+        //    setColorValue << <1, 1 >> > (c, G, rmnDatasetFileLoader.getColor()[c].g);
+        //    setColorValue << <1, 1 >> > (c, B, rmnDatasetFileLoader.getColor()[c].b);
+        //    setColorValue << <1, 1 >> > (c, A, rmnDatasetFileLoader.getColor()[c].a);
+        //}
+
+        cudaError = cudaMemcpyToSymbol(colors, rmnDatasetFileLoader.getColor().data(), rmnDatasetFileLoader.getColor().size() * sizeof(Color));
+        if (cudaError != cudaSuccess)
+            throw runtime_error(makeCudaErrorMessage("cudaMemcpyToSymbol", cudaError, __FILE__, __LINE__));
+
+        //for (size_t c = 0; c < rmnDatasetFileLoader.getColormap().size(); c++)
+        //{
+        //    if (c % 2 == 0)
+        //        setColormapValue << <1, 1 >> > (c / 2, rmnDatasetFileLoader.getColormap()[c]);
+        //    else
+        //        setColormapColor << <1, 1 >> > (c / 2, rmnDatasetFileLoader.getColormap()[c]);
+        //}
+        //
+        //setColormapLength << <1, 1 >> > (rmnDatasetFileLoader.getColormap().size());
+
+        cudaError = cudaMemcpyToSymbol(colormap, rmnDatasetFileLoader.getColormap().data(), rmnDatasetFileLoader.getColormap().size() * sizeof(unsigned int));
+        if (cudaError != cudaSuccess)
+            throw runtime_error(makeCudaErrorMessage("cudaMemcpyToSymbol", cudaError, __FILE__, __LINE__));
+        
+        size_t colormapSize = rmnDatasetFileLoader.getColormap().size();
+        cudaError = cudaMemcpyToSymbol(colormapLength, &colormapSize, sizeof(size_t));
+        if (cudaError != cudaSuccess)
+            throw runtime_error(makeCudaErrorMessage("cudaMemcpyToSymbol", cudaError, __FILE__, __LINE__));
+
+>>>>>>> texture_memory_3D
         rmnDim = rmnDatasetFileLoader.getRmnDatasetDimensions();
 
         float dsx = rmnDim.x, dsy = rmnDim.y, dsz = rmnDim.z;
@@ -563,6 +709,22 @@ int main(int argc, char** argv)
         if (cudaError != cudaSuccess)
             throw runtime_error(makeCudaErrorMessage("cudaMemcpyToSymbol", cudaError, __FILE__, __LINE__));
 
+<<<<<<< HEAD
+=======
+        //for (size_t i = 0; i < 6; i++)
+        //{
+        //    setPlane << <1, 1 >> > (i, planeHost[i]);
+        //}
+
+        //int nr0 = 0, nr1 = 0;
+        //for (int i = 0; i < rmnDim.x * rmnDim.y * rmnDim.z; i++)
+        //{
+        //    if (rmnDatasetFileLoader.getRmnDataset()[i] == 0) nr0++;
+        //    else nr1++;
+        //}
+        //
+        //cout << "0 : " << nr0 << " 1 : " << nr1 << " raport : " << (float)nr0 / nr1 << endl;
+>>>>>>> texture_memory_3D
 
         cudaError = cudaMalloc((void**)&dev_rmnDataUnaligned, rmnDim.x * rmnDim.y * rmnDim.z * sizeof(char));
         if (cudaError != cudaSuccess)
