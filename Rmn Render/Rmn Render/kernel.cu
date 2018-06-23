@@ -24,7 +24,7 @@
 
 #define pi 3.141592653f
 #define epsilon 0.001f
-#define step 0.1f
+#define step 0.5f
 #define ambient 0.3f
 #define diffuse 0.7f
 
@@ -48,66 +48,15 @@ const int dim = 512;
 
 FpsDisplay fpsDisplay({imageHeigth, imageWidth});
 
-//__constant__ float4 colors[10];
-//__constant__ unsigned int colormap[256];
-__constant__ float r[256];
-__constant__ float g[256];
-__constant__ float b[256];
-__constant__ float a[256];
-__constant__ size_t colormapLength[1];
+
+float* dev_r;
+float* dev_g;
+float* dev_b;
+float* dev_a;
+
 
 __constant__ float4 plane[6];
 
-//__global__ void setPlane(size_t pos, float4 planeHost)
-//{
-//    plane[pos].x = planeHost.x;
-//    plane[pos].y = planeHost.y;
-//    plane[pos].z = planeHost.z;
-//    plane[pos].w = planeHost.w;
-//}
-
-//__device__ unsigned int getColormapValue(size_t key)
-//{
-//    return colormap[key].x;
-//}
-//
-//__device__ unsigned int getColormapColor(size_t key)
-//{
-//    return colormap[key].y;
-//}
-
-//__global__ void setColormapValue(size_t key, unsigned int value)
-//{
-//    colormap[key].x = value;
-//    colormapLength[0]++;
-//}
-//
-//__global__ void setColormapColor(size_t key, unsigned int color)
-//{
-//    colormap[key].y = color;
-//}
-
-//__device__ float getColorValue(size_t key, size_t color)
-//{
-//    return ((float*)(colors + key))[color];
-//}
-
-//__global__ void setColorValue(size_t key, size_t color, float value)
-//{
-//    ((float*)(colors + key))[color] = value;
-//}
-
-//__global__ void setColormapLength(size_t length)
-//{
-//    colormapLength[0] = length;
-//}
-
-//__device__ int getPositionForColormapEntryValue(float value)
-//{
-//    int pos = value;
-//    
-//    return colormap[pos % 256];
-//}
 
 __device__ int pointNormal(dim3 dataSize, float3 point)
 {
@@ -231,7 +180,7 @@ __device__ float meanPointValue(unsigned char* rmnData, dim3 dataSize, float3 po
     return c;
 }
 
-__global__ void renderFrame(unsigned char* rmnData, dim3 dataSize, uint2 imageDim, unsigned int rotation, float3* normals, uchar4* ptr)
+__global__ void renderFrame(unsigned char* rmnData, dim3 dataSize, uint2 imageDim, unsigned int rotation, float3* normals, uchar4* ptr, float* r, float* g, float* b, float* a)
 {
     size_t x = threadIdx.x + blockIdx.x * blockDim.x;
     size_t y = threadIdx.y + blockIdx.y * blockDim.y;
@@ -368,12 +317,11 @@ __global__ void renderFrame(unsigned char* rmnData, dim3 dataSize, uint2 imageDi
         //if (position < 0) continue;
 
         position = meanPointValue(rmnData, dataSize, point);
-        if (position <= 0 && position > 255) continue;
 
-        c[R] = r[position];//getColorValue(position, R);
-        c[G] = g[position];//getColorValue(position, G);
-        c[B] = b[position];//getColorValue(position, B);
-        c[A] = a[position];//getColorValue(position, A);
+        c[R] = r[position];
+        c[G] = g[position];
+        c[B] = b[position];
+        c[A] = a[position];
 
         position = pointNormal(dataSize, point);
 
@@ -454,7 +402,7 @@ __host__ void renderFrame(uchar4* pixels, void* parameters, size_t ticks)
 
     cudaEventRecord(start);
 
-    renderFrame << <grids, threads >> > (kernelParams->dev_rmnData, kernelParams->rmnDim, kernelParams->imageDim, kernelParams->rotation, kernelParams->dev_normals, pixels);
+    renderFrame << <grids, threads >> > (kernelParams->dev_rmnData, kernelParams->rmnDim, kernelParams->imageDim, kernelParams->rotation, kernelParams->dev_normals, pixels, dev_r, dev_g, dev_b, dev_a);
 
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
@@ -505,27 +453,17 @@ int main(int argc, char** argv)
 
         rmnDatasetFileLoader.loadDataset();
 
-        //for (size_t c = 0; c < rmnDatasetFileLoader.getColor().size(); c++)
-        //{
-        //    setColorValue << <1, 1 >> > (c, R, rmnDatasetFileLoader.getColor()[c].r);
-        //    setColorValue << <1, 1 >> > (c, G, rmnDatasetFileLoader.getColor()[c].g);
-        //    setColorValue << <1, 1 >> > (c, B, rmnDatasetFileLoader.getColor()[c].b);
-        //    setColorValue << <1, 1 >> > (c, A, rmnDatasetFileLoader.getColor()[c].a);
-        //}
-
         //cudaError = cudaMemcpyToSymbol(colors, rmnDatasetFileLoader.getColor().data(), rmnDatasetFileLoader.getColor().size() * sizeof(Color));
         //if (cudaError != cudaSuccess)
         //    throw runtime_error(makeCudaErrorMessage("cudaMemcpyToSymbol", cudaError, __FILE__, __LINE__));
 
-        //for (size_t c = 0; c < rmnDatasetFileLoader.getColormap().size(); c++)
-        //{
-        //    if (c % 2 == 0)
-        //        setColormapValue << <1, 1 >> > (c / 2, rmnDatasetFileLoader.getColormap()[c]);
-        //    else
-        //        setColormapColor << <1, 1 >> > (c / 2, rmnDatasetFileLoader.getColormap()[c]);
-        //}
+        //cudaError = cudaMemcpyToSymbol(colormap, host_colormap, 256 * sizeof(unsigned int));
+        //if (cudaError != cudaSuccess)
+        //    throw runtime_error(makeCudaErrorMessage("cudaMemcpyToSymbol", cudaError, __FILE__, __LINE__));
         //
-        //setColormapLength << <1, 1 >> > (rmnDatasetFileLoader.getColormap().size());
+        //cudaError = cudaMemcpyToSymbol(colormapLength, &colormapSize, sizeof(size_t));
+        //if (cudaError != cudaSuccess)
+        //    throw runtime_error(makeCudaErrorMessage("cudaMemcpyToSymbol", cudaError, __FILE__, __LINE__));
 
         size_t colormapSize = rmnDatasetFileLoader.getColormap().size();
         unsigned int host_colormap[256];
@@ -552,29 +490,39 @@ int main(int argc, char** argv)
             host_a[i] = rmnDatasetFileLoader.getColor()[host_colormap[i]].a;
         }
 
-        cudaError = cudaMemcpyToSymbol(r, host_r, 256 * sizeof(float));
+        cudaError = cudaMalloc((void**)&dev_r, 256 * sizeof(float));
+        if (cudaError != cudaSuccess)
+            throw runtime_error(makeCudaErrorMessage("cudaMalloc", cudaError, __FILE__, __LINE__));
+
+        cudaError = cudaMalloc((void**)&dev_g, 256 * sizeof(float));
+        if (cudaError != cudaSuccess)
+            throw runtime_error(makeCudaErrorMessage("cudaMalloc", cudaError, __FILE__, __LINE__));
+
+        cudaError = cudaMalloc((void**)&dev_b, 256 * sizeof(float));
+        if (cudaError != cudaSuccess)
+            throw runtime_error(makeCudaErrorMessage("cudaMalloc", cudaError, __FILE__, __LINE__));
+
+        cudaError = cudaMalloc((void**)&dev_a, 256 * sizeof(float));
+        if (cudaError != cudaSuccess)
+            throw runtime_error(makeCudaErrorMessage("cudaMalloc", cudaError, __FILE__, __LINE__));
+
+
+        cudaError = cudaMemcpy(dev_r, host_r, 256 * sizeof(float), cudaMemcpyHostToDevice);
         if (cudaError != cudaSuccess)
             throw runtime_error(makeCudaErrorMessage("cudaMemcpyToSymbol", cudaError, __FILE__, __LINE__));
         
-        cudaError = cudaMemcpyToSymbol(g, host_g, 256 * sizeof(float));
+        cudaError = cudaMemcpy(dev_g, host_g, 256 * sizeof(float), cudaMemcpyHostToDevice);
         if (cudaError != cudaSuccess)
             throw runtime_error(makeCudaErrorMessage("cudaMemcpyToSymbol", cudaError, __FILE__, __LINE__));
 
-        cudaError = cudaMemcpyToSymbol(b, host_b, 256 * sizeof(float));
+        cudaError = cudaMemcpy(dev_b, host_b, 256 * sizeof(float), cudaMemcpyHostToDevice);
         if (cudaError != cudaSuccess)
             throw runtime_error(makeCudaErrorMessage("cudaMemcpyToSymbol", cudaError, __FILE__, __LINE__));
 
-        cudaError = cudaMemcpyToSymbol(a, host_a, 256 * sizeof(float));
+        cudaError = cudaMemcpy(dev_a, host_a, 256 * sizeof(float), cudaMemcpyHostToDevice);
         if (cudaError != cudaSuccess)
             throw runtime_error(makeCudaErrorMessage("cudaMemcpyToSymbol", cudaError, __FILE__, __LINE__));
 
-        //cudaError = cudaMemcpyToSymbol(colormap, host_colormap, 256 * sizeof(unsigned int));
-        //if (cudaError != cudaSuccess)
-        //    throw runtime_error(makeCudaErrorMessage("cudaMemcpyToSymbol", cudaError, __FILE__, __LINE__));
-        //
-        //cudaError = cudaMemcpyToSymbol(colormapLength, &colormapSize, sizeof(size_t));
-        //if (cudaError != cudaSuccess)
-        //    throw runtime_error(makeCudaErrorMessage("cudaMemcpyToSymbol", cudaError, __FILE__, __LINE__));
 
         rmnDim = rmnDatasetFileLoader.getRmnDatasetDimensions();
 
@@ -593,19 +541,6 @@ int main(int argc, char** argv)
         if (cudaError != cudaSuccess)
             throw runtime_error(makeCudaErrorMessage("cudaMemcpyToSymbol", cudaError, __FILE__, __LINE__));
 
-        //for (size_t i = 0; i < 6; i++)
-        //{
-        //    setPlane << <1, 1 >> > (i, planeHost[i]);
-        //}
-
-        //int nr0 = 0, nr1 = 0;
-        //for (int i = 0; i < rmnDim.x * rmnDim.y * rmnDim.z; i++)
-        //{
-        //    if (rmnDatasetFileLoader.getRmnDataset()[i] == 0) nr0++;
-        //    else nr1++;
-        //}
-        //
-        //cout << "0 : " << nr0 << " 1 : " << nr1 << " raport : " << (float)nr0 / nr1 << endl;
 
         cudaError = cudaMalloc((void**)&dev_rmnData, rmnDim.x * rmnDim.y * rmnDim.z * sizeof(char));
         if (cudaError != cudaSuccess)
