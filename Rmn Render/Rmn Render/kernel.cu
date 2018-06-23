@@ -54,6 +54,11 @@ float* dev_g;
 float* dev_b;
 float* dev_a;
 
+texture<float> tex_r;
+texture<float> tex_g;
+texture<float> tex_b;
+texture<float> tex_a;
+
 
 __constant__ float4 plane[6];
 
@@ -318,10 +323,10 @@ __global__ void renderFrame(unsigned char* rmnData, dim3 dataSize, uint2 imageDi
 
         position = meanPointValue(rmnData, dataSize, point);
 
-        c[R] = r[position];
-        c[G] = g[position];
-        c[B] = b[position];
-        c[A] = a[position];
+        c[R] = tex1Dfetch(tex_r, position);
+        c[G] = tex1Dfetch(tex_g, position);
+        c[B] = tex1Dfetch(tex_b, position);
+        c[A] = tex1Dfetch(tex_a, position);
 
         position = pointNormal(dataSize, point);
 
@@ -509,20 +514,37 @@ int main(int argc, char** argv)
 
         cudaError = cudaMemcpy(dev_r, host_r, 256 * sizeof(float), cudaMemcpyHostToDevice);
         if (cudaError != cudaSuccess)
-            throw runtime_error(makeCudaErrorMessage("cudaMemcpyToSymbol", cudaError, __FILE__, __LINE__));
+            throw runtime_error(makeCudaErrorMessage("cudaMemcpy", cudaError, __FILE__, __LINE__));
         
         cudaError = cudaMemcpy(dev_g, host_g, 256 * sizeof(float), cudaMemcpyHostToDevice);
         if (cudaError != cudaSuccess)
-            throw runtime_error(makeCudaErrorMessage("cudaMemcpyToSymbol", cudaError, __FILE__, __LINE__));
+            throw runtime_error(makeCudaErrorMessage("cudaMemcpy", cudaError, __FILE__, __LINE__));
 
         cudaError = cudaMemcpy(dev_b, host_b, 256 * sizeof(float), cudaMemcpyHostToDevice);
         if (cudaError != cudaSuccess)
-            throw runtime_error(makeCudaErrorMessage("cudaMemcpyToSymbol", cudaError, __FILE__, __LINE__));
+            throw runtime_error(makeCudaErrorMessage("cudaMemcpy", cudaError, __FILE__, __LINE__));
 
         cudaError = cudaMemcpy(dev_a, host_a, 256 * sizeof(float), cudaMemcpyHostToDevice);
         if (cudaError != cudaSuccess)
-            throw runtime_error(makeCudaErrorMessage("cudaMemcpyToSymbol", cudaError, __FILE__, __LINE__));
+            throw runtime_error(makeCudaErrorMessage("cudaMemcpy", cudaError, __FILE__, __LINE__));
 
+        cudaChannelFormatDesc descrFloat = cudaCreateChannelDesc<float>();
+
+        cudaError = cudaBindTexture(0, tex_r, dev_r, descrFloat, 256);
+        if (cudaError != cudaSuccess)
+            throw runtime_error(makeCudaErrorMessage("cudaBindTexture", cudaError, __FILE__, __LINE__));
+
+        cudaError = cudaBindTexture(0, tex_g, dev_g, descrFloat, 256);
+        if (cudaError != cudaSuccess)
+            throw runtime_error(makeCudaErrorMessage("cudaBindTexture", cudaError, __FILE__, __LINE__));
+
+        cudaError = cudaBindTexture(0, tex_b, dev_b, descrFloat, 256);
+        if (cudaError != cudaSuccess)
+            throw runtime_error(makeCudaErrorMessage("cudaBindTexture", cudaError, __FILE__, __LINE__));
+
+        cudaError = cudaBindTexture(0, tex_a, dev_a, descrFloat, 256);
+        if (cudaError != cudaSuccess)
+            throw runtime_error(makeCudaErrorMessage("cudaBindTexture", cudaError, __FILE__, __LINE__));
 
         rmnDim = rmnDatasetFileLoader.getRmnDatasetDimensions();
 
