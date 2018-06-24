@@ -16,3 +16,4 @@ Rmn Render/x64/Data/vertebra.dat
 *.exe
 *.ilk
 *.suo
+*.idb
