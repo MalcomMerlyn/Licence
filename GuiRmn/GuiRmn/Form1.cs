@@ -65,8 +65,16 @@ namespace GuiRmn
             string[] tokens = textbox_path.Text.Split('\\');
             string fileName = tokens[tokens.Length - 1];
 
-            Process.Start(@"C:\Users\Batman\Desktop\Computer Science\Licence\Rmn Render\x64\Release\Rmn Render.exe",
+            if (radioButton1.Checked)
+            {
+                Process.Start(@"C:\Users\Batman\Desktop\Computer Science\Licence\Rmn Render Internal\x64\Release\Rmn Render.exe",
                 "\"" + textbox_path.Text + "\" " + fileName + " " + text_h.Text + " " + text_w.Text);
+            }
+            else
+            {
+                Process.Start(@"C:\Users\Batman\Desktop\Computer Science\Licence\Rmn Render\x64\Release\Rmn Render.exe",
+                "\"" + textbox_path.Text + "\" " + fileName + " " + text_h.Text + " " + text_w.Text);
+            }
         }
     }
 }

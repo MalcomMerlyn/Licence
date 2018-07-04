@@ -37,6 +37,8 @@
             this.label2 = new System.Windows.Forms.Label();
             this.label3 = new System.Windows.Forms.Label();
             this.Start = new System.Windows.Forms.Button();
+            this.radioButton1 = new System.Windows.Forms.RadioButton();
+            this.label4 = new System.Windows.Forms.Label();
             this.SuspendLayout();
             // 
             // button_path
@@ -52,6 +54,7 @@
             // 
             // textbox_path
             // 
+            this.textbox_path.BackColor = System.Drawing.SystemColors.MenuHighlight;
             this.textbox_path.Font = new System.Drawing.Font("Times New Roman", 20.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.textbox_path.Location = new System.Drawing.Point(93, 32);
             this.textbox_path.Name = "textbox_path";
@@ -62,6 +65,7 @@
             // 
             // text_h
             // 
+            this.text_h.BackColor = System.Drawing.SystemColors.MenuHighlight;
             this.text_h.Font = new System.Drawing.Font("Microsoft Sans Serif", 24F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.text_h.Location = new System.Drawing.Point(200, 120);
             this.text_h.Name = "text_h";
@@ -83,6 +87,7 @@
             // 
             // text_w
             // 
+            this.text_w.BackColor = System.Drawing.SystemColors.MenuHighlight;
             this.text_w.Font = new System.Drawing.Font("Microsoft Sans Serif", 24F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.text_w.Location = new System.Drawing.Point(402, 120);
             this.text_w.Name = "text_w";
@@ -117,18 +122,45 @@
             this.Start.BackgroundImage = ((System.Drawing.Image)(resources.GetObject("Start.BackgroundImage")));
             this.Start.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Stretch;
             this.Start.Font = new System.Drawing.Font("Microsoft Sans Serif", 36F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.Start.Location = new System.Drawing.Point(726, 185);
+            this.Start.Location = new System.Drawing.Point(746, 161);
             this.Start.Name = "Start";
             this.Start.Size = new System.Drawing.Size(220, 220);
             this.Start.TabIndex = 7;
             this.Start.UseVisualStyleBackColor = true;
             this.Start.Click += new System.EventHandler(this.Start_Click);
             // 
+            // radioButton1
+            // 
+            this.radioButton1.AutoSize = true;
+            this.radioButton1.BackColor = System.Drawing.Color.Goldenrod;
+            this.radioButton1.Font = new System.Drawing.Font("Microsoft Sans Serif", 27.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.radioButton1.Location = new System.Drawing.Point(93, 213);
+            this.radioButton1.Name = "radioButton1";
+            this.radioButton1.Size = new System.Drawing.Size(338, 46);
+            this.radioButton1.TabIndex = 8;
+            this.radioButton1.TabStop = true;
+            this.radioButton1.Text = "Internal Structure";
+            this.radioButton1.UseVisualStyleBackColor = false;
+            // 
+            // label4
+            // 
+            this.label4.AutoSize = true;
+            this.label4.Font = new System.Drawing.Font("Microsoft Sans Serif", 24F, ((System.Drawing.FontStyle)((System.Drawing.FontStyle.Bold | System.Drawing.FontStyle.Italic))), System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label4.Location = new System.Drawing.Point(27, 445);
+            this.label4.Name = "label4";
+            this.label4.Size = new System.Drawing.Size(772, 37);
+            this.label4.TabIndex = 9;
+            this.label4.Text = "Use W, A, S, D key to navigate arround the object";
+            // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            this.BackColor = System.Drawing.Color.Goldenrod;
+            this.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Stretch;
             this.ClientSize = new System.Drawing.Size(1091, 526);
+            this.Controls.Add(this.label4);
+            this.Controls.Add(this.radioButton1);
             this.Controls.Add(this.Start);
             this.Controls.Add(this.label3);
             this.Controls.Add(this.label2);
@@ -137,6 +169,7 @@
             this.Controls.Add(this.text_h);
             this.Controls.Add(this.textbox_path);
             this.Controls.Add(this.button_path);
+            this.ForeColor = System.Drawing.SystemColors.ControlText;
             this.Name = "Form1";
             this.Text = "Form1";
             this.ResumeLayout(false);
@@ -154,6 +187,8 @@
         private System.Windows.Forms.Label label2;
         private System.Windows.Forms.Label label3;
         private System.Windows.Forms.Button Start;
+        private System.Windows.Forms.RadioButton radioButton1;
+        private System.Windows.Forms.Label label4;
     }
 }
 
