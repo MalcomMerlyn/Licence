@@ -23,7 +23,7 @@ __device__ int pointNormal(dim3 dataSize, float3 point)
 
 __device__ float composeRGBA(float prev, float color, float alpha)
 {
-    return prev * (1 - alpha) + color * alpha;
+    return prev * alpha + color * (1 - alpha);
 }
 
 __device__ unsigned char colorFloatToByte(float color)
