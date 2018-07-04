@@ -425,12 +425,12 @@ unique_ptr<unsigned char, function<void(unsigned char*)>> dev_rmnDataUnaligned_u
 
 int main(int argc, char** argv)
 {
+    printf("%s %s\n", argv[1], argv[2]);
+
     RmnDatasetFileLoader rmnDatasetFileLoader(argv[1], argv[2]);
 
     imageWidth = atoi(argv[3]);
     imageHeigth = atoi(argv[4]);
-
-    printf("%d %d\n", imageWidth, imageHeigth);
 
     dim3 rmnDim;
 
@@ -618,5 +618,8 @@ int main(int argc, char** argv)
         cerr << "Fatal error!" << endl;
     }
     
+    int a;
+    std::cin >> a;
+
     return 0;
 }
