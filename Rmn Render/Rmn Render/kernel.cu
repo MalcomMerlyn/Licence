@@ -8,6 +8,8 @@
 #include "GpuGlInteropAnim.h"
 #include "RmnDatasetFileLoader.h"
 #include "FpsDisplay.h"
+#include "KernelLaunchParams.h"
+#include "RayCastUtils.h"
 
 #include <stdio.h>
 
@@ -17,17 +19,6 @@
 #include <iostream>
 #include <memory>
 #include <vector>
-
-#define R 0
-#define G 1
-#define B 2
-#define A 3
-
-#define pi 3.141592653f
-#define epsilon 0.001f
-#define step 3
-#define ambient 0.3f
-#define diffuse 0.7f
 
 using std::cout;
 using std::cerr;
@@ -41,80 +32,31 @@ using std::runtime_error;
 using std::unique_ptr;
 using std::vector;
 
-dim3 rmnDim;
+__device__ const unsigned int R = 0;
+__device__ const unsigned int G = 1;
+__device__ const unsigned int B = 2;
+__device__ const unsigned int A = 3;
+
+__device__ const float pi = 3.141592653f;
+__device__ const float epsilon = 0.001f;
+__device__ const float step = 3;
+__device__ const float ambient = 0.3f;
+__device__ const float diffuse = 0.7f;
 
 unsigned int imageHeigth = 512;
 unsigned int imageWidth = 512;
 
-const int dim = 512;
-
 texture<char, 3, cudaReadModeElementType> textureRmnData;
 cudaArray* dev_rmnDataArray = 0;
 
-FpsDisplay fpsDisplay({imageHeigth, imageWidth});
-
+FpsDisplay fpsDisplay({ imageHeigth, imageWidth });
 
 float* dev_r;
 float* dev_g;
 float* dev_b;
 float* dev_a;
 
-
 __constant__ float4 plane[6];
-
-
-__device__ int pointNormal(dim3 dataSize, float3 point)
-{
-    int i = point.x, j = point.y, k = point.z;
-
-    i = i < 0 ? 0 : (i >= dataSize.x ? dataSize.x - 1 : i);
-    j = j < 0 ? 0 : (j >= dataSize.y ? dataSize.y - 1 : j);
-    k = k < 0 ? 0 : (k >= dataSize.z ? dataSize.z - 1 : k);
-
-    return i * dataSize.y * dataSize.z + j * dataSize.z + k;
-}
-
-__device__ float composeRGBA(float prev, float color, float alpha)
-{
-    return prev * alpha + color * (1 - alpha);
-}
-
-__device__ unsigned char colorFloatToByte(float color)
-{
-    float f = 255 * color;
-    
-    if (f < 0) f = 0.0f;
-    if (f > 255) f = 255.0f;
-
-    return floor(f);
-}
-
-__device__ float length(float x, float y, float z)
-{
-    return sqrt(x * x + y * y + z * z);
-}
-
-__device__ float vectorLength(float3 vector)
-{
-    return sqrt(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z);
-}
-
-__device__ float3 normalizeVector(float3 vector)
-{
-    float3 normalizedVector;
-    float length = vectorLength(vector);
-
-    normalizedVector.x = vector.x / length;
-    normalizedVector.y = vector.y / length;
-    normalizedVector.z = vector.z / length;
-
-    return normalizedVector;
-}
-
-__device__ float imageCoordonateToViewPlane(size_t imageCoordonate, size_t imageSize, float viewPlaneSize)
-{
-    return (float)imageCoordonate * viewPlaneSize / (float)imageSize - viewPlaneSize / 2.0f;
-}
 
 __global__ void calculateNormals(unsigned char* rmnData, dim3 dataSize, float3* normals)
 {
@@ -155,7 +97,7 @@ __global__ void calculateNormals(unsigned char* rmnData, dim3 dataSize, float3* 
             
         m.z += k - 2 < 0 ? 0 : rmnData[(i - 0) * s.x + (j - 0) * s.y + (k - 2) * s.z];
         p.z += k + 2 > dataSize.z ? 0 : rmnData[(i + 0) * s.x + (j + 0) * s.y + (k + 2) * s.z];
-
+        
         // Add the cells sorounding the cell above and bellow with factor mul
         for (int o = 0; o < 9; o++)
         {
@@ -189,17 +131,14 @@ __device__ float meanPointValue(unsigned char* rmnData, dim3 dataSize, float3 po
 
     unsigned char c000, c001, c010, c011, c100, c101, c110, c111;
 
-    //if (i >= 0 && i + 1 < dataSize.x && j >= 0 && j + 1 < dataSize.y && k >= 0 && k + 1 < dataSize.z)
-    //{
-        c000 = tex3D(textureRmnData, i + 0, j + 0, k + 0);
-        c001 = tex3D(textureRmnData, i + 0, j + 0, k + 1);
-        c010 = tex3D(textureRmnData, i + 0, j + 1, k + 0);
-        c011 = tex3D(textureRmnData, i + 0, j + 1, k + 1);
-        c100 = tex3D(textureRmnData, i + 1, j + 0, k + 0);
-        c101 = tex3D(textureRmnData, i + 1, j + 0, k + 1);
-        c110 = tex3D(textureRmnData, i + 1, j + 1, k + 0);
-        c111 = tex3D(textureRmnData, i + 1, j + 1, k + 1);
-    //}
+    c000 = tex3D(textureRmnData, i + 0, j + 0, k + 0);
+    c001 = tex3D(textureRmnData, i + 0, j + 0, k + 1);
+    c010 = tex3D(textureRmnData, i + 0, j + 1, k + 0);
+    c011 = tex3D(textureRmnData, i + 0, j + 1, k + 1);
+    c100 = tex3D(textureRmnData, i + 1, j + 0, k + 0);
+    c101 = tex3D(textureRmnData, i + 1, j + 0, k + 1);
+    c110 = tex3D(textureRmnData, i + 1, j + 1, k + 0);
+    c111 = tex3D(textureRmnData, i + 1, j + 1, k + 1);
     
     float c00 = c000 * (1.0f - xf) + c100 * xf;
     float c10 = c010 * (1.0f - xf) + c110 * xf;
@@ -214,7 +153,7 @@ __device__ float meanPointValue(unsigned char* rmnData, dim3 dataSize, float3 po
     return c;
 }
 
-__global__ void renderFrame(unsigned char* rmnData, dim3 dataSize, uint2 imageDim, unsigned int rotation, float3* normals, uchar4* ptr, float* r, float* g, float* b, float* a)
+__global__ void renderFrame(unsigned char* rmnData, dim3 dataSize, uint2 imageDim, int2 rotation, float3* normals, uchar4* ptr, float* r, float* g, float* b, float* a, float ratio)
 {
     size_t x = threadIdx.x + blockIdx.x * blockDim.x;
     size_t y = threadIdx.y + blockIdx.y * blockDim.y;
@@ -226,9 +165,9 @@ __global__ void renderFrame(unsigned char* rmnData, dim3 dataSize, uint2 imageDi
 
     float3 viewPointPosition;
     float rmnDataDiagonalLength = length(dataSize.x, dataSize.y, dataSize.z);
-    viewPointPosition.x = 0.5f * dataSize.x + 3 * rmnDataDiagonalLength * sin(rotation * pi / 180);
-    viewPointPosition.y = -0.75f * dataSize.y;// +3 * rmnDataDiagonalLength * sin(90 * pi / 180);
-    viewPointPosition.z = 0.5f * dataSize.z + 3 * rmnDataDiagonalLength * cos(rotation * pi / 180);// +3 * rmnDataDiagonalLength * cos(90 * pi / 180);
+    viewPointPosition.x = ratio * rmnDataDiagonalLength * sin(rotation.x * pi / 180) * cos(rotation.y * pi / 180);
+    viewPointPosition.y = ratio * rmnDataDiagonalLength * cos(rotation.x * pi / 180);
+    viewPointPosition.z = ratio * rmnDataDiagonalLength * sin(rotation.x * pi / 180) * sin(rotation.y * pi / 180);
 
     float3 viewPointDirection;
     viewPointDirection.x = 0.5f * dataSize.x - viewPointPosition.x;
@@ -423,15 +362,6 @@ __global__ void renderFrame(unsigned char* rmnData, dim3 dataSize, uint2 imageDi
     ptr[offset].w = 255;
 }
 
-typedef struct _KernelLaunchParams
-{
-    unsigned char* dev_rmnData;
-    float3* dev_normals;
-    uint2 imageDim;
-    dim3 rmnDim;
-    unsigned int rotation;
-}KernelLaunchParams;
-
 cudaEvent_t start, stop;
 float minFps = 1000, meanFps = 0;
 
@@ -444,7 +374,19 @@ __host__ void renderFrame(uchar4* pixels, void* parameters, size_t ticks)
 
     cudaEventRecord(start);
 
-    renderFrame << <grids, threads >> > (kernelParams->dev_rmnData, kernelParams->rmnDim, kernelParams->imageDim, kernelParams->rotation, kernelParams->dev_normals, pixels, dev_r, dev_g, dev_b, dev_a);
+    renderFrame << <grids, threads >> > (
+        kernelParams->dev_rmnData
+        , kernelParams->rmnDim
+        , kernelParams->imageDim
+        , kernelParams->rotation
+        , kernelParams->dev_normals
+        , pixels
+        , dev_r
+        , dev_g
+        , dev_b
+        , dev_a
+        , kernelParams->ratio
+    );
 
     cudaEventRecord(stop);
     cudaEventSynchronize(stop);
@@ -455,31 +397,31 @@ __host__ void renderFrame(uchar4* pixels, void* parameters, size_t ticks)
     float fps = 1000 / milliseconds;
     fpsDisplay.displayFps(pixels, fps);
 
-    static float f[360];
-    static int i = 0;
+    //static float f[360];
+    //static int i = 0;
 
-    meanFps += fps;
-    if (fps < minFps && kernelParams->rotation > 5) 
-        minFps = fps;
+    //meanFps += fps;
+    //if (fps < minFps && kernelParams->rotation > 5) 
+    //    minFps = fps;
 
-    f[i] = fps; i++;
+    //f[i] = fps; i++;
 
-    kernelParams->rotation += 1;
-    if (kernelParams->rotation == 359)
-    {
-        float stdDev = 0;
-
-        meanFps = meanFps / 360;
-
-        for (int k = 0; k < 360; k++)
-            stdDev += abs(f[k] - meanFps);
-
-        cout << "Minimum fps " << minFps << endl;
-        cout << "Mean fps " << meanFps << endl;
-        cout << "Standard dev fps " << stdDev / 360 << endl;
-        cudaDeviceReset();
-        exit(0);
-    }
+    //kernelParams->rotation += 1;
+    //if (kernelParams->rotation == 359)
+    //{
+    //    float stdDev = 0;
+    //
+    //    meanFps = meanFps / 360;
+    //
+    //    for (int k = 0; k < 360; k++)
+    //        stdDev += abs(f[k] - meanFps);
+    //
+    //    cout << "Minimum fps " << minFps << endl;
+    //    cout << "Mean fps " << meanFps << endl;
+    //    cout << "Standard dev fps " << stdDev / 360 << endl;
+    //    cudaDeviceReset();
+    //    exit(0);
+    //}
 }
 
 unique_ptr<unsigned char, function<void(unsigned char*)>> dev_normals_uptr;
@@ -489,7 +431,14 @@ unique_ptr<unsigned char, function<void(unsigned char*)>> dev_rmnDataUnaligned_u
 
 int main(int argc, char** argv)
 {
-    RmnDatasetFileLoader rmnDatasetFileLoader("../Data", "vertebra");
+    printf("%s %s\n", argv[1], argv[2]);
+
+    RmnDatasetFileLoader rmnDatasetFileLoader(argv[1], argv[2]);
+
+    imageWidth = atoi(argv[3]);
+    imageHeigth = atoi(argv[4]);
+
+    dim3 rmnDim;
 
     unsigned char* dev_rmnData;
     unsigned char* dev_rmnDataUnaligned;
@@ -511,18 +460,6 @@ int main(int argc, char** argv)
             throw runtime_error(makeCudaErrorMessage("cudaEventCreate", cudaError, __FILE__, __LINE__));
 
         rmnDatasetFileLoader.loadDataset();
-
-        //cudaError = cudaMemcpyToSymbol(colors, rmnDatasetFileLoader.getColor().data(), rmnDatasetFileLoader.getColor().size() * sizeof(Color));
-        //if (cudaError != cudaSuccess)
-        //    throw runtime_error(makeCudaErrorMessage("cudaMemcpyToSymbol", cudaError, __FILE__, __LINE__));
-
-        //cudaError = cudaMemcpyToSymbol(colormap, host_colormap, 256 * sizeof(unsigned int));
-        //if (cudaError != cudaSuccess)
-        //    throw runtime_error(makeCudaErrorMessage("cudaMemcpyToSymbol", cudaError, __FILE__, __LINE__));
-        //
-        //cudaError = cudaMemcpyToSymbol(colormapLength, &colormapSize, sizeof(size_t));
-        //if (cudaError != cudaSuccess)
-        //    throw runtime_error(makeCudaErrorMessage("cudaMemcpyToSymbol", cudaError, __FILE__, __LINE__));
 
         size_t colormapSize = rmnDatasetFileLoader.getColormap().size();
         unsigned int host_colormap[256];
@@ -635,19 +572,6 @@ int main(int argc, char** argv)
                         rmnDatasetFileLoader.getRmnDataset()[i * rmnDim.y * rmnDim.z + j * rmnDim.z + k];
                 }
 
-        //cudaError = cudaMalloc((void**)&dev_rmnData, rmnDim.x * rmnDim.y * rmnDim.z * sizeof(char));
-        //if (cudaError != cudaSuccess)
-        //    throw runtime_error(makeCudaErrorMessage("cudaMalloc", cudaError, __FILE__, __LINE__));
-        //
-        //dev_rmnData_uptr = unique_ptr<unsigned char, function<void(unsigned char*)>>(
-        //    dev_rmnData,
-        //    [](unsigned char* dev_ptr) { cout << "CudaFree" << endl; cudaFree(dev_ptr); }
-        //);
-        //
-        //cudaError = cudaMemcpy(dev_rmnData, reorderedRmnData, textureDim * textureDim * textureDim * sizeof(unsigned char), cudaMemcpyHostToDevice);
-        //if (cudaError != cudaError::cudaSuccess)
-        //    throw runtime_error(makeCudaErrorMessage("cudaMemcpy", cudaError, __FILE__, __LINE__));
-
         cudaChannelFormatDesc descriptor = cudaCreateChannelDesc<char>();
         cudaExtent rmnDataVolumeSize = { rmnDim.x, rmnDim.y, rmnDim.z };
         cudaError = cudaMalloc3DArray(&dev_rmnDataArray, &descriptor, rmnDataVolumeSize);
@@ -687,7 +611,7 @@ int main(int argc, char** argv)
         params.dev_rmnData = dev_rmnData;
         params.imageDim = imageDim;
         params.rmnDim = rmnDim;
-        params.rotation = 0;
+        //params.rotation = 0;
 
         GpuGLAnim::animAdExit(renderFrame, nullptr, imageHeigth, imageWidth, static_cast<void*>(&params));
     }
@@ -700,5 +624,8 @@ int main(int argc, char** argv)
         cerr << "Fatal error!" << endl;
     }
     
+    int a;
+    std::cin >> a;
+
     return 0;
 }

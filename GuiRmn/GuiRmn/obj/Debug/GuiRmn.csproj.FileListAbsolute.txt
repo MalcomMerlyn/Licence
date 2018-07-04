@@ -1,0 +1,9 @@
+C:\Users\Batman\Desktop\Computer Science\Licence\GuiRmn\GuiRmn\bin\Debug\GuiRmn.exe.config
+C:\Users\Batman\Desktop\Computer Science\Licence\GuiRmn\GuiRmn\bin\Debug\GuiRmn.exe
+C:\Users\Batman\Desktop\Computer Science\Licence\GuiRmn\GuiRmn\bin\Debug\GuiRmn.pdb
+C:\Users\Batman\Desktop\Computer Science\Licence\GuiRmn\GuiRmn\obj\Debug\GuiRmn.csprojResolveAssemblyReference.cache
+C:\Users\Batman\Desktop\Computer Science\Licence\GuiRmn\GuiRmn\obj\Debug\GuiRmn.Form1.resources
+C:\Users\Batman\Desktop\Computer Science\Licence\GuiRmn\GuiRmn\obj\Debug\GuiRmn.Properties.Resources.resources
+C:\Users\Batman\Desktop\Computer Science\Licence\GuiRmn\GuiRmn\obj\Debug\GuiRmn.csproj.GenerateResource.Cache
+C:\Users\Batman\Desktop\Computer Science\Licence\GuiRmn\GuiRmn\obj\Debug\GuiRmn.exe
+C:\Users\Batman\Desktop\Computer Science\Licence\GuiRmn\GuiRmn\obj\Debug\GuiRmn.pdb
