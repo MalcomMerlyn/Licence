@@ -36,6 +36,12 @@
     <ClInclude Include="ErrnoErrorMessage.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="RayCastUtils.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="KernelLaunchParams.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="RmnDatasetFileLoader.cpp">

@@ -9,6 +9,7 @@
 
 #include "CudaErrorMessage.h"
 #include "GLProcedures.h"
+#include "KernelLaunchParams.h"
 
 #include <iostream>
 #include <stdexcept>
@@ -56,6 +57,8 @@ private:
         m_height = height;
         m_dataBlock = dataBlock;
         m_fClickDrag = nullptr;
+        m_rotation.x = 90;
+        m_ratio = 3;
 
         cudaDeviceProp prop;
         int dev;
@@ -113,8 +116,8 @@ private:
         {
             if (state == GLUT_DOWN)
             {
-                getInstance()->m_dragStartX = xPos;
-                getInstance()->m_dragStartY = yPos;
+                getInstance()->m_rotation.x = xPos;
+                getInstance()->m_rotation.y = yPos;
             }
             else if (state == GLUT_UP)
             {
@@ -134,11 +137,14 @@ private:
         error = cudaGraphicsMapResources(1, &(getInstance()->m_resource), 0);
         if (error != cudaSuccess)
             throw runtime_error(makeCudaErrorMessage("cudaGraphicsMapResources", error, __FILE__, __LINE__));
-
+        
         error = cudaGraphicsResourceGetMappedPointer((void**)&devPtr, &size, getInstance()->m_resource);
         if (error != cudaSuccess)
             throw runtime_error(makeCudaErrorMessage("cudaGraphicsResourceGetMappedPointer", error, __FILE__, __LINE__));
 
+        ((KernelLaunchParams*)getInstance()->m_dataBlock)->rotation.x = getInstance()->m_rotation.x;
+        ((KernelLaunchParams*)getInstance()->m_dataBlock)->rotation.y = getInstance()->m_rotation.y;
+        ((KernelLaunchParams*)getInstance()->m_dataBlock)->ratio = getInstance()->m_ratio;
         getInstance()->m_fGenerateFrame(devPtr, getInstance()->m_dataBlock, m_ticks++);
 
         error = cudaGraphicsUnmapResources(1, &getInstance()->m_resource, 0);
@@ -150,12 +156,37 @@ private:
 
     static void s_key(unsigned char key, int x, int y)
     {
+        //printf("%d\n", key);
         switch (key)
         {
         case 27:
             getInstance()->Destroy();
+            cudaDeviceReset();
             exit(0);
+        case 97:
+            getInstance()->m_rotation.y++;
+            return;
+        case 100:
+            getInstance()->m_rotation.y--;
+            return;
+        case 98:
+            getInstance()->m_ratio -= 0.1;
+            return;
+        case 118:
+            getInstance()->m_ratio += 0.1;
+            return;
+        case 119:
+            getInstance()->m_rotation.x--;
+            getInstance()->m_rotation.x %= 181;
+            break;
+        case 115:
+            getInstance()->m_rotation.x++;
+            getInstance()->m_rotation.x %= 181;
+            break;
         }
+
+        //if (getInstance()->m_rotation.x > 180) getInstance()->m_rotation.x = 180;
+        //if (getInstance()->m_rotation.x < 0) getInstance()->m_rotation.x = 0;
     }
 
     static void s_draw(void)
@@ -166,6 +197,8 @@ private:
         glutSwapBuffers();
     }
 
+    float m_ratio;
+    int2 m_rotation;
     GLuint m_bufferObj;
     cudaGraphicsResource* m_resource;
     int m_width, m_height;

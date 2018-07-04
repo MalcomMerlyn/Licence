@@ -204,6 +204,8 @@ copy "$(CudaToolkitBinDir)\cudart*.dll" "$(OutDir)"</Command>
     <ClInclude Include="FpsDisplay.h" />
     <ClInclude Include="GLProcedures.h" />
     <ClInclude Include="GpuGlInteropAnim.h" />
+    <ClInclude Include="KernelLaunchParams.h" />
+    <ClInclude Include="RayCastUtils.h" />
     <ClInclude Include="VisualStudioCompilerErrors.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
