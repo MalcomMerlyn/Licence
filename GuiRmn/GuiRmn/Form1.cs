@@ -76,5 +76,10 @@ namespace GuiRmn
                 "\"" + textbox_path.Text + "\" " + fileName + " " + text_h.Text + " " + text_w.Text);
             }
         }
+
+        private void radioButton2_CheckedChanged(object sender, EventArgs e)
+        {
+
+        }
     }
 }

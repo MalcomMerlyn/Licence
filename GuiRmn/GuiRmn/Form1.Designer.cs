@@ -39,6 +39,7 @@
             this.Start = new System.Windows.Forms.Button();
             this.radioButton1 = new System.Windows.Forms.RadioButton();
             this.label4 = new System.Windows.Forms.Label();
+            this.radioButton2 = new System.Windows.Forms.RadioButton();
             this.SuspendLayout();
             // 
             // button_path
@@ -134,7 +135,7 @@
             this.radioButton1.AutoSize = true;
             this.radioButton1.BackColor = System.Drawing.Color.Goldenrod;
             this.radioButton1.Font = new System.Drawing.Font("Microsoft Sans Serif", 27.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.radioButton1.Location = new System.Drawing.Point(93, 213);
+            this.radioButton1.Location = new System.Drawing.Point(93, 303);
             this.radioButton1.Name = "radioButton1";
             this.radioButton1.Size = new System.Drawing.Size(338, 46);
             this.radioButton1.TabIndex = 8;
@@ -152,6 +153,20 @@
             this.label4.TabIndex = 9;
             this.label4.Text = "Use W, A, S, D key to navigate arround the object";
             // 
+            // radioButton2
+            // 
+            this.radioButton2.AutoSize = true;
+            this.radioButton2.BackColor = System.Drawing.Color.Goldenrod;
+            this.radioButton2.Font = new System.Drawing.Font("Microsoft Sans Serif", 27.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.radioButton2.Location = new System.Drawing.Point(93, 217);
+            this.radioButton2.Name = "radioButton2";
+            this.radioButton2.Size = new System.Drawing.Size(321, 46);
+            this.radioButton2.TabIndex = 10;
+            this.radioButton2.TabStop = true;
+            this.radioButton2.Text = "Object Structure";
+            this.radioButton2.UseVisualStyleBackColor = false;
+            this.radioButton2.CheckedChanged += new System.EventHandler(this.radioButton2_CheckedChanged);
+            // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
@@ -159,6 +174,7 @@
             this.BackColor = System.Drawing.Color.Goldenrod;
             this.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Stretch;
             this.ClientSize = new System.Drawing.Size(1091, 526);
+            this.Controls.Add(this.radioButton2);
             this.Controls.Add(this.label4);
             this.Controls.Add(this.radioButton1);
             this.Controls.Add(this.Start);
@@ -189,6 +205,7 @@
         private System.Windows.Forms.Button Start;
         private System.Windows.Forms.RadioButton radioButton1;
         private System.Windows.Forms.Label label4;
+        private System.Windows.Forms.RadioButton radioButton2;
     }
 }
 
