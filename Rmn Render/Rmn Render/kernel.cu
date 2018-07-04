@@ -43,8 +43,8 @@ using std::vector;
 
 dim3 rmnDim;
 
-unsigned int imageHeigth = 512;
-unsigned int imageWidth = 512;
+unsigned int imageHeigth = 1400;
+unsigned int imageWidth = 1400;
 
 const int dim = 512;
 
@@ -124,24 +124,53 @@ __global__ void calculateNormals(unsigned char* rmnData, dim3 dataSize, float3* 
     float3 m, p, normal;
     dim3 s;
 
+    int off[9][2] = {{-1, -1}, {-1, 0}, {-1, 1}, {0, -1}, {0, 0}, {0, 1}, {1, -1}, {1, 0}, {1, 1}};
+
     s.x = dataSize.y * dataSize.z;
     s.y = dataSize.z;
     s.z = 1;
 
-    if (i >= dataSize.x || j >= dataSize.y) return;
+    const float mul = 0.4f;
 
-    for (size_t k = 0; k < dataSize.z; k++)
+    if (i == 0 || j == 0 || i >= dataSize.x - 1 || j >= dataSize.y - 1) return;
+
+    for (size_t k = 1; k < dataSize.z - 1; k++)
     {
+        // Add the cell above and below
         m.x = i == 0 ? 0 : rmnData[(i - 1) * s.x + (j - 0) * s.y + (k - 0) * s.z];
         p.x = i == dataSize.x - 1 ? 0 : rmnData[(i + 1) * s.x + (j + 0) * s.y + (k + 0) * s.z];
-        normal.x = p.x - m.x;
 
         m.y = j == 0 ? 0 : rmnData[(i - 0) * s.x + (j - 1) * s.y + (k - 0) * s.z];
         p.y = j == dataSize.y - 1 ? 0 : rmnData[(i + 0) * s.x + (j + 1) * s.y + (k + 0) * s.z];
-        normal.y = p.y - m.y;
 
         m.z = k == 0 ? 0 : rmnData[(i - 0) * s.x + (j - 0) * s.y + (k - 1) * s.z];
-        p.z = k == dataSize.z - 1 ? 0 : rmnData[(i + 0) * s.x + (j + 0) * s.y + (k + 1) * s.z];
+        p.z = k == dataSize.z - 1 ? 0 : rmnData[(i + 0) * s.x + (j +0) * s.y + (k + 1) * s.z];
+
+        // Add the second cell above and below
+        m.x += i - 2 < 0 ? 0 : rmnData[(i - 2) * s.x + (j - 0) * s.y + (k - 0) * s.z];
+        p.x += i + 2 == dataSize.x ? 0 : rmnData[(i + 2) * s.x + (j + 0) * s.y + (k + 0) * s.z];
+            
+        m.y += j - 2 < 0 ? 0 : rmnData[(i - 0) * s.x + (j - 2) * s.y + (k - 0) * s.z];
+        p.y += j + 2 == dataSize.y ? 0 : rmnData[(i + 0) * s.x + (j + 2) * s.y + (k + 0) * s.z];
+            
+        m.z += k - 2 < 0 ? 0 : rmnData[(i - 0) * s.x + (j - 0) * s.y + (k - 2) * s.z];
+        p.z += k + 2 > dataSize.z ? 0 : rmnData[(i + 0) * s.x + (j + 0) * s.y + (k + 2) * s.z];
+
+        // Add the cells sorounding the cell above and bellow with factor mul
+        for (int o = 0; o < 9; o++)
+        {
+            m.x += mul * (i == 0 ? 0 : rmnData[(i - 1) * s.x + (j - off[o][0]) * s.y + (k - off[o][1]) * s.z]);
+            p.x += mul * (i == dataSize.x - 1 ? 0 : rmnData[(i + 1) * s.x + (j + off[o][0]) * s.y + (k + off[o][1]) * s.z]);
+                         
+            m.y += mul * (j == 0 ? 0 : rmnData[(i - off[o][0]) * s.x + (j - 1) * s.y + (k - off[o][1]) * s.z]);
+            p.y += mul * (j == dataSize.y - 1 ? 0 : rmnData[(i + off[o][0]) * s.x + (j + 1) * s.y + (k + off[o][1]) * s.z]);
+                         
+            m.z += mul * (k == 0 ? 0 : rmnData[(i - off[o][0]) * s.x + (j - off[o][1]) * s.y + (k - 1) * s.z]);
+            p.z += mul * (k == dataSize.z - 1 ? 0 : rmnData[(i + off[o][0]) * s.x + (j + off[o][1]) * s.y + (k + 1) * s.z]);
+        }
+
+        normal.x = p.x - m.x;
+        normal.y = p.y - m.y;
         normal.z = p.z - m.z;
 
         normals[i * s.x + j * s.y + k * s.z] = normalizeVector(normal);
@@ -198,7 +227,7 @@ __global__ void renderFrame(unsigned char* rmnData, dim3 dataSize, uint2 imageDi
     float3 viewPointPosition;
     float rmnDataDiagonalLength = length(dataSize.x, dataSize.y, dataSize.z);
     viewPointPosition.x = 0.5f * dataSize.x + 3 * rmnDataDiagonalLength * sin(rotation * pi / 180);
-    viewPointPosition.y = -0.75f * dataSize.y;// +3 * rmnDataDiagonalLength * sin(90 * pi / 180);
+    viewPointPosition.y = -0.75 * dataSize.y;// +3 * rmnDataDiagonalLength * sin(90 * pi / 180);
     viewPointPosition.z = 0.5f * dataSize.z + 3 * rmnDataDiagonalLength * cos(rotation * pi / 180);// +3 * rmnDataDiagonalLength * cos(90 * pi / 180);
 
     float3 viewPointDirection;
@@ -327,6 +356,8 @@ __global__ void renderFrame(unsigned char* rmnData, dim3 dataSize, uint2 imageDi
         c[G] = g[position];
         c[B] = b[position];
         c[A] = a[position];
+
+        if (c[A] < 0.1) continue;
 
         position = pointNormal(dataSize, point);
 
